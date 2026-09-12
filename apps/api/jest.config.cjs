@@ -3,7 +3,7 @@ const {
 } = require('ts-jest');
 
 const esmPreset = createDefaultEsmPreset({
-  tsconfig: './tsconfig.json',
+  tsconfig: './tsconfig.spec.json',
 });
 
 module.exports = {
