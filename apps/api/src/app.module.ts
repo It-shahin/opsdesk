@@ -6,18 +6,23 @@ import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { validateEnv } from './config/env.validation.js';
+import { AuthModule } from './auth/auth.module.js'
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['apps/api/.env', '.env'],
-      validate: validateEnv,
-    }),
+  ConfigModule.forRoot({
+    isGlobal: true,
+    envFilePath: ['apps/api/.env', '.env'],
+    validate: validateEnv,
+  }),
 
-    DatabaseModule,
-    RedisModule,
-  ],
+  DatabaseModule,
+  RedisModule,
+  AuthModule,
+  AuthModule,
+  UsersModule,
+],
   controllers: [AppController],
   providers: [AppService],
 })
