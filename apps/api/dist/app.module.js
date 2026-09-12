@@ -11,6 +11,7 @@ import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { validateEnv } from './config/env.validation.js';
+import { AuthModule } from './auth/auth.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -23,6 +24,7 @@ AppModule = __decorate([
             }),
             DatabaseModule,
             RedisModule,
+            AuthModule,
         ],
         controllers: [AppController],
         providers: [AppService],

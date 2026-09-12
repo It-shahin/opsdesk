@@ -5,3 +5,5 @@ node_modules
 .agents
 .claude
 .windsurf
+# Turborepo cache
+.turbo/

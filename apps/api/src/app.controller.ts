@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from './database/prisma.service.js';
 import { RedisService } from './redis/redis.service.js';
+import { Public } from './auth/public.decorator.js';
 
 @Controller()
 export class AppController {
@@ -9,6 +10,7 @@ export class AppController {
     private readonly redis: RedisService,
   ) {}
 
+  @Public()
   @Get()
   getRoot() {
     return {
@@ -17,6 +19,7 @@ export class AppController {
     };
   }
 
+  @Public()
   @Get('health')
   async health() {
     await this.prisma.$queryRaw`SELECT 1`;

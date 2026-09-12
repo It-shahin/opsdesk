@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from './database/prisma.service.js';
 import { RedisService } from './redis/redis.service.js';
+import { Public } from './auth/public.decorator.js';
 let AppController = class AppController {
     prisma;
     redis;
@@ -36,12 +37,14 @@ let AppController = class AppController {
     }
 };
 __decorate([
+    Public(),
     Get(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AppController.prototype, "getRoot", null);
 __decorate([
+    Public(),
     Get('health'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
