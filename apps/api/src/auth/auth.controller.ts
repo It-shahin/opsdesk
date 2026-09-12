@@ -3,12 +3,7 @@ import {
   Get,
   Req,
 } from '@nestjs/common';
-import type { Request } from 'express';
-import type { JWTPayload } from 'jose';
-
-type AuthenticatedRequest = Request & {
-  auth: JWTPayload;
-};
+import type { AuthenticatedRequest } from './auth.types.js';
 
 @Controller('auth')
 export class AuthController {
