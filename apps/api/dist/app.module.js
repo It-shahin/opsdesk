@@ -13,6 +13,9 @@ import { RedisModule } from './redis/redis.module.js';
 import { validateEnv } from './config/env.validation.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
+import { OrganizationsModule } from './organizations/organizations.module.js';
+import { MembershipsModule } from './memberships/memberships.module.js';
+import { TenancyModule } from './tenancy/tenancy.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -28,6 +31,9 @@ AppModule = __decorate([
             AuthModule,
             AuthModule,
             UsersModule,
+            OrganizationsModule,
+            MembershipsModule,
+            TenancyModule
         ],
         controllers: [AppController],
         providers: [AppService],
