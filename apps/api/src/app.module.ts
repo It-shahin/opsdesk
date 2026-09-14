@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module.js'
 import { UsersModule } from './users/users.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { MembershipsModule } from './memberships/memberships.module.js';
+import { TenancyModule } from './tenancy/tenancy.module.js';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { MembershipsModule } from './memberships/memberships.module.js';
   AuthModule,
   UsersModule,
   OrganizationsModule,
-  MembershipsModule
+  MembershipsModule,
+  TenancyModule
 ],
   controllers: [AppController],
   providers: [AppService],
