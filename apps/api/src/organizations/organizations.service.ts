@@ -3,11 +3,15 @@ import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../database/prisma.service.js';
 
+import { MembershipsService } from '../memberships/memberships.service.js';
+
 @Injectable()
 export class OrganizationsService {
   constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  private readonly prisma: PrismaService,
+  private readonly membershipsService:
+    MembershipsService,
+) {}
 
   async createForUser(
     userId: string,
@@ -50,34 +54,24 @@ export class OrganizationsService {
   }
 
   async listForUser(userId: string) {
-    const memberships =
-      await this.prisma.membership.findMany({
-        where: {
-          userId,
-        },
-
-        include: {
-          organization: true,
-        },
-
-        orderBy: {
-          createdAt: 'asc',
-        },
-      });
-
-    return memberships.map(
-      ({ organization, role }) => ({
-        id: organization.id,
-        name: organization.name,
-        slug: organization.slug,
-        role,
-        createdAt:
-          organization.createdAt,
-        updatedAt:
-          organization.updatedAt,
-      }),
+  const memberships =
+    await this.membershipsService.listForUser(
+      userId,
     );
-  }
+
+  return memberships.map(
+    ({ organization, role }) => ({
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      role,
+      createdAt:
+        organization.createdAt,
+      updatedAt:
+        organization.updatedAt,
+    }),
+  );
+}
 
   private generateSlug(name: string): string {
     const base = name
