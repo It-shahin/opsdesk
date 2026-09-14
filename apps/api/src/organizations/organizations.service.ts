@@ -73,6 +73,24 @@ export class OrganizationsService {
   );
 }
 
+  async findById(
+  organizationId: string,
+) {
+  return this.prisma.organization.findUnique({
+    where: {
+      id: organizationId,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
   private generateSlug(name: string): string {
     const base = name
       .normalize('NFKD')
