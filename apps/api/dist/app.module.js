@@ -17,6 +17,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
 import { MembershipsModule } from './memberships/memberships.module.js';
 import { TenancyModule } from './tenancy/tenancy.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
+import { MembersModule } from './members/members.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -35,7 +36,8 @@ AppModule = __decorate([
             OrganizationsModule,
             MembershipsModule,
             TenancyModule,
-            RbacModule
+            RbacModule,
+            MembersModule
         ],
         controllers: [AppController],
         providers: [AppService],
