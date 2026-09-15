@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1789503097625" clover="3.2.0">
+  <project timestamp="1789503097625" name="All files">
+    <metrics statements="397" coveredstatements="185" conditionals="278" coveredconditionals="137" methods="89" coveredmethods="35" elements="764" coveredelements="357" complexity="0" loc="397" ncloc="397" packages="15" files="41" classes="41"/>
+    <package name="src">
+      <metrics statements="12" coveredstatements="0" conditionals="10" coveredconditionals="0" methods="4" coveredmethods="0"/>
+      <file name="app.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\app.controller.ts">
+        <metrics statements="9" coveredstatements="0" conditionals="10" coveredconditionals="0" methods="3" coveredmethods="0"/>
+        <line num="7" count="0" type="stmt"/>
+        <line num="9" count="0" type="cond" truecount="0" falsecount="8"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="15" count="0" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="29" count="0" type="stmt"/>
+      </file>
+      <file name="app.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\app.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="41" count="0" type="stmt"/>
+      </file>
+      <file name="app.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\app.service.ts">
+        <metrics statements="2" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="4" count="0" type="stmt"/>
+        <line num="6" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.auth">
+      <metrics statements="48" coveredstatements="28" conditionals="32" coveredconditionals="20" methods="6" coveredmethods="3"/>
+      <file name="auth.guard.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\auth\auth.guard.ts">
+        <metrics statements="30" coveredstatements="24" conditionals="22" coveredconditionals="17" methods="3" coveredmethods="3"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="28" count="4" type="cond" truecount="6" falsecount="2"/>
+        <line num="29" count="4" type="stmt"/>
+        <line num="31" count="4" type="stmt"/>
+        <line num="34" count="4" type="stmt"/>
+        <line num="37" count="4" type="stmt"/>
+        <line num="43" count="4" type="stmt"/>
+        <line num="48" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="49" count="1" type="stmt"/>
+        <line num="53" count="3" type="stmt"/>
+        <line num="55" count="3" type="stmt"/>
+        <line num="57" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="58" count="2" type="stmt"/>
+        <line num="61" count="1" type="stmt"/>
+        <line num="62" count="1" type="stmt"/>
+        <line num="72" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="73" count="0" type="stmt"/>
+        <line num="78" count="0" type="stmt"/>
+        <line num="79" count="0" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+        <line num="83" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="84" count="0" type="stmt"/>
+        <line num="87" count="1" type="stmt"/>
+        <line num="94" count="3" type="stmt"/>
+        <line num="96" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="97" count="1" type="stmt"/>
+        <line num="100" count="2" type="stmt"/>
+        <line num="102" count="2" type="cond" truecount="4" falsecount="0"/>
+        <line num="103" count="1" type="stmt"/>
+        <line num="106" count="1" type="stmt"/>
+      </file>
+      <file name="auth.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\auth\auth.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="17" count="0" type="stmt"/>
+      </file>
+      <file name="auth0-userinfo.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\auth\auth0-userinfo.service.ts">
+        <metrics statements="15" coveredstatements="2" conditionals="10" coveredconditionals="3" methods="2" coveredmethods="0"/>
+        <line num="10" count="2" type="stmt"/>
+        <line num="19" count="2" type="stmt"/>
+        <line num="22" count="0" type="cond" truecount="3" falsecount="1"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="40" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="41" count="0" type="stmt"/>
+        <line num="46" count="0" type="stmt"/>
+        <line num="48" count="0" type="stmt"/>
+        <line num="50" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="51" count="0" type="stmt"/>
+        <line num="56" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="57" count="0" type="stmt"/>
+        <line num="62" count="0" type="stmt"/>
+      </file>
+      <file name="public.decorator.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\auth\public.decorator.ts">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="5" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.config">
+      <metrics statements="6" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+      <file name="env.validation.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\config\env.validation.ts">
+        <metrics statements="6" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="3" count="0" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="20" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="21" count="0" type="stmt"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.database">
+      <metrics statements="8" coveredstatements="1" conditionals="2" coveredconditionals="0" methods="2" coveredmethods="0"/>
+      <file name="database.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\database\database.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="9" count="0" type="stmt"/>
+      </file>
+      <file name="prisma.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\database\prisma.service.ts">
+        <metrics statements="7" coveredstatements="1" conditionals="2" coveredconditionals="0" methods="2" coveredmethods="0"/>
+        <line num="6" count="6" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="13" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="14" count="0" type="stmt"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="21" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.invitations">
+      <metrics statements="95" coveredstatements="71" conditionals="70" coveredconditionals="41" methods="18" coveredmethods="12"/>
+      <file name="invitation-acceptance.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\invitation-acceptance.controller.ts">
+        <metrics statements="6" coveredstatements="0" conditionals="12" coveredconditionals="0" methods="2" coveredmethods="0"/>
+        <line num="15" count="0" type="stmt"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="39" count="0" type="stmt"/>
+      </file>
+      <file name="invitations.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\invitations.controller.ts">
+        <metrics statements="17" coveredstatements="0" conditionals="14" coveredconditionals="0" methods="4" coveredmethods="0"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="40" count="0" type="stmt"/>
+        <line num="48" count="0" type="stmt"/>
+        <line num="50" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="51" count="0" type="stmt"/>
+        <line num="56" count="0" type="stmt"/>
+        <line num="64" count="0" type="stmt"/>
+        <line num="69" count="0" type="stmt"/>
+        <line num="71" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="72" count="0" type="stmt"/>
+        <line num="77" count="0" type="stmt"/>
+        <line num="84" count="0" type="stmt"/>
+        <line num="95" count="0" type="stmt"/>
+        <line num="97" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="98" count="0" type="stmt"/>
+        <line num="103" count="0" type="stmt"/>
+      </file>
+      <file name="invitations.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\invitations.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="30" count="0" type="stmt"/>
+      </file>
+      <file name="invitations.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\invitations.service.ts">
+        <metrics statements="71" coveredstatements="71" conditionals="44" coveredconditionals="41" methods="12" coveredmethods="12"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="22" count="19" type="cond" truecount="3" falsecount="1"/>
+        <line num="30" count="6" type="stmt"/>
+        <line num="36" count="3" type="stmt"/>
+        <line num="39" count="3" type="stmt"/>
+        <line num="44" count="3" type="stmt"/>
+        <line num="46" count="3" type="stmt"/>
+        <line num="48" count="3" type="stmt"/>
+        <line num="54" count="3" type="stmt"/>
+        <line num="57" count="3" type="stmt"/>
+        <line num="68" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="70" count="1" type="stmt"/>
+        <line num="85" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="86" count="1" type="stmt"/>
+        <line num="93" count="2" type="stmt"/>
+        <line num="114" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="115" count="1" type="stmt"/>
+        <line num="120" count="1" type="stmt"/>
+        <line num="164" count="1" type="stmt"/>
+        <line num="178" count="11" type="stmt"/>
+        <line num="187" count="1" type="stmt"/>
+        <line num="216" count="1" type="stmt"/>
+        <line num="218" count="4" type="stmt"/>
+        <line num="229" count="5" type="stmt"/>
+        <line num="257" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="258" count="1" type="stmt"/>
+        <line num="263" count="4" type="stmt"/>
+        <line num="268" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="269" count="1" type="stmt"/>
+        <line num="274" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="275" count="1" type="stmt"/>
+        <line num="281" count="1" type="stmt"/>
+        <line num="311" count="1" type="stmt"/>
+        <line num="324" count="8" type="stmt"/>
+        <line num="327" count="8" type="stmt"/>
+        <line num="329" count="8" type="stmt"/>
+        <line num="331" count="8" type="stmt"/>
+        <line num="334" count="8" type="stmt"/>
+        <line num="358" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="359" count="1" type="stmt"/>
+        <line num="364" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="368" count="1" type="stmt"/>
+        <line num="373" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="374" count="1" type="stmt"/>
+        <line num="379" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="380" count="1" type="stmt"/>
+        <line num="385" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="388" count="1" type="stmt"/>
+        <line num="394" count="3" type="stmt"/>
+        <line num="408" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="409" count="1" type="stmt"/>
+        <line num="415" count="2" type="stmt"/>
+        <line num="433" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="434" count="1" type="stmt"/>
+        <line num="440" count="1" type="stmt"/>
+        <line num="463" count="1" type="stmt"/>
+        <line num="491" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="492" count="6" type="stmt"/>
+        <line num="495" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="496" count="1" type="stmt"/>
+        <line num="501" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="505" count="3" type="stmt"/>
+        <line num="526" count="7" type="stmt"/>
+        <line num="540" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="541" count="1" type="stmt"/>
+        <line num="544" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="545" count="3" type="stmt"/>
+        <line num="548" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="552" count="1" type="stmt"/>
+        <line num="555" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.invitations.dto">
+      <metrics statements="6" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="2" coveredmethods="0"/>
+      <file name="accept-invitation.dto.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\dto\accept-invitation.dto.ts">
+        <metrics statements="2" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="10" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="17" count="0" type="stmt"/>
+      </file>
+      <file name="create-invitation.dto.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\invitations\dto\create-invitation.dto.ts">
+        <metrics statements="4" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="9" count="0" type="stmt"/>
+        <line num="18" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.members">
+      <metrics statements="35" coveredstatements="21" conditionals="36" coveredconditionals="22" methods="8" coveredmethods="5"/>
+      <file name="members.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\members\members.controller.ts">
+        <metrics statements="12" coveredstatements="0" conditionals="12" coveredconditionals="0" methods="3" coveredmethods="0"/>
+        <line num="28" count="0" type="stmt"/>
+        <line num="30" count="0" type="stmt"/>
+        <line num="38" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="44" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="45" count="0" type="stmt"/>
+        <line num="50" count="0" type="stmt"/>
+        <line num="60" count="0" type="stmt"/>
+        <line num="73" count="0" type="stmt"/>
+        <line num="75" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="76" count="0" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+      </file>
+      <file name="members.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\members\members.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="25" count="0" type="stmt"/>
+      </file>
+      <file name="members.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\members\members.service.ts">
+        <metrics statements="22" coveredstatements="21" conditionals="24" coveredconditionals="22" methods="5" coveredmethods="5"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="15" count="8" type="cond" truecount="3" falsecount="1"/>
+        <line num="21" count="1" type="stmt"/>
+        <line num="53" count="7" type="stmt"/>
+        <line num="56" count="7" type="stmt"/>
+        <line num="80" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="81" count="1" type="stmt"/>
+        <line num="86" count="6" type="stmt"/>
+        <line num="92" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="97" count="2" type="stmt"/>
+        <line num="105" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="106" count="1" type="stmt"/>
+        <line num="113" count="3" type="stmt"/>
+        <line num="139" count="3" type="stmt"/>
+        <line num="152" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="153" count="3" type="stmt"/>
+        <line num="156" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="157" count="0" type="stmt"/>
+        <line num="162" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="166" count="1" type="stmt"/>
+        <line num="171" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="175" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.members.dto">
+      <metrics statements="2" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="update-member-role.dto.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\members\dto\update-member-role.dto.ts">
+        <metrics statements="2" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="5" count="0" type="stmt"/>
+        <line num="14" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.memberships">
+      <metrics statements="7" coveredstatements="6" conditionals="4" coveredconditionals="3" methods="4" coveredmethods="4"/>
+      <file name="memberships.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\memberships\memberships.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="13" count="0" type="stmt"/>
+      </file>
+      <file name="memberships.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\memberships\memberships.service.ts">
+        <metrics statements="6" coveredstatements="6" conditionals="4" coveredconditionals="3" methods="4" coveredmethods="4"/>
+        <line num="6" count="3" type="stmt"/>
+        <line num="8" count="5" type="cond" truecount="3" falsecount="1"/>
+        <line num="15" count="2" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="47" count="2" type="stmt"/>
+        <line num="59" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.organizations">
+      <metrics statements="33" coveredstatements="0" conditionals="26" coveredconditionals="0" methods="11" coveredmethods="0"/>
+      <file name="organizations.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\organizations\organizations.controller.ts">
+        <metrics statements="17" coveredstatements="0" conditionals="16" coveredconditionals="0" methods="4" coveredmethods="0"/>
+        <line num="19" count="0" type="stmt"/>
+        <line num="21" count="0" type="cond" truecount="0" falsecount="8"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="46" count="0" type="stmt"/>
+        <line num="50" count="0" type="stmt"/>
+        <line num="57" count="0" type="stmt"/>
+        <line num="60" count="0" type="stmt"/>
+        <line num="62" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="63" count="0" type="stmt"/>
+        <line num="69" count="0" type="stmt"/>
+        <line num="73" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="74" count="0" type="stmt"/>
+        <line num="79" count="0" type="stmt"/>
+      </file>
+      <file name="organizations.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\organizations\organizations.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="27" count="0" type="stmt"/>
+      </file>
+      <file name="organizations.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\organizations\organizations.service.ts">
+        <metrics statements="15" coveredstatements="0" conditionals="10" coveredconditionals="0" methods="7" coveredmethods="0"/>
+        <line num="9" count="0" type="stmt"/>
+        <line num="11" count="0" type="cond" truecount="0" falsecount="8"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="62" count="0" type="stmt"/>
+        <line num="63" count="0" type="stmt"/>
+        <line num="79" count="0" type="stmt"/>
+        <line num="95" count="0" type="stmt"/>
+        <line num="103" count="0" type="stmt"/>
+        <line num="105" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.organizations.dto">
+      <metrics statements="2" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+      <file name="create-organization.dto.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\organizations\dto\create-organization.dto.ts">
+        <metrics statements="2" coveredstatements="0" conditionals="2" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="10" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="17" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.rbac">
+      <metrics statements="25" coveredstatements="23" conditionals="16" coveredconditionals="14" methods="6" coveredmethods="5"/>
+      <file name="permission.guard.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\permission.guard.ts">
+        <metrics statements="14" coveredstatements="14" conditionals="16" coveredconditionals="14" methods="2" coveredmethods="2"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="19" count="5" type="cond" truecount="6" falsecount="2"/>
+        <line num="20" count="5" type="stmt"/>
+        <line num="28" count="5" type="stmt"/>
+        <line num="37" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="41" count="1" type="stmt"/>
+        <line num="45" count="4" type="stmt"/>
+        <line num="49" count="4" type="stmt"/>
+        <line num="51" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="52" count="1" type="stmt"/>
+        <line num="58" count="3" type="stmt"/>
+        <line num="64" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="65" count="1" type="stmt"/>
+        <line num="70" count="2" type="stmt"/>
+      </file>
+      <file name="permissions.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\permissions.service.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="3"/>
+        <line num="8" count="2" type="stmt"/>
+        <line num="14" count="9" type="stmt"/>
+        <line num="16" count="9" type="stmt"/>
+        <line num="23" count="2" type="stmt"/>
+        <line num="25" count="4" type="stmt"/>
+      </file>
+      <file name="permissions.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\permissions.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="2" type="stmt"/>
+      </file>
+      <file name="rbac.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\rbac.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="16" count="0" type="stmt"/>
+      </file>
+      <file name="require-permissions.decorator.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\require-permissions.decorator.ts">
+        <metrics statements="3" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+      </file>
+      <file name="role-permissions.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\rbac\role-permissions.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="7" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.redis">
+      <metrics statements="9" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="5" coveredmethods="0"/>
+      <file name="redis.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\redis\redis.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="9" count="0" type="stmt"/>
+      </file>
+      <file name="redis.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\redis\redis.service.ts">
+        <metrics statements="8" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="5" coveredmethods="0"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="13" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="14" count="0" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.tenancy">
+      <metrics statements="89" coveredstatements="21" conditionals="44" coveredconditionals="21" methods="17" coveredmethods="4"/>
+      <file name="tenancy.e2e-spec.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\tenancy\tenancy.e2e-spec.ts">
+        <metrics statements="67" coveredstatements="0" conditionals="20" coveredconditionals="0" methods="13" coveredmethods="0"/>
+        <line num="29" count="0" type="stmt"/>
+        <line num="32" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="38" count="0" type="stmt"/>
+        <line num="41" count="0" type="stmt"/>
+        <line num="46" count="0" type="stmt"/>
+        <line num="51" count="0" type="stmt"/>
+        <line num="53" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="57" count="0" type="stmt"/>
+        <line num="61" count="0" type="stmt"/>
+        <line num="64" count="0" type="stmt"/>
+        <line num="67" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="71" count="0" type="stmt"/>
+        <line num="75" count="0" type="stmt"/>
+        <line num="78" count="0" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+        <line num="87" count="0" type="stmt"/>
+        <line num="91" count="0" type="stmt"/>
+        <line num="94" count="0" type="stmt"/>
+        <line num="97" count="0" type="stmt"/>
+        <line num="99" count="0" type="stmt"/>
+        <line num="100" count="0" type="stmt"/>
+        <line num="104" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="108" count="0" type="stmt"/>
+        <line num="113" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="117" count="0" type="stmt"/>
+        <line num="122" count="0" type="stmt"/>
+        <line num="128" count="0" type="stmt"/>
+        <line num="133" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="137" count="0" type="stmt"/>
+        <line num="150" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="154" count="0" type="stmt"/>
+        <line num="167" count="0" type="stmt"/>
+        <line num="171" count="0" type="stmt"/>
+        <line num="175" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="178" count="0" type="stmt"/>
+        <line num="191" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="194" count="0" type="stmt"/>
+        <line num="207" count="0" type="stmt"/>
+        <line num="212" count="0" type="stmt"/>
+        <line num="247" count="0" type="stmt"/>
+        <line num="250" count="0" type="stmt"/>
+        <line num="254" count="0" type="stmt"/>
+        <line num="257" count="0" type="stmt"/>
+        <line num="258" count="0" type="stmt"/>
+        <line num="261" count="0" type="stmt"/>
+        <line num="262" count="0" type="stmt"/>
+        <line num="265" count="0" type="stmt"/>
+        <line num="267" count="0" type="stmt"/>
+        <line num="279" count="0" type="stmt"/>
+        <line num="285" count="0" type="stmt"/>
+        <line num="292" count="0" type="stmt"/>
+        <line num="293" count="0" type="stmt"/>
+        <line num="305" count="0" type="stmt"/>
+        <line num="312" count="0" type="stmt"/>
+        <line num="317" count="0" type="stmt"/>
+        <line num="319" count="0" type="stmt"/>
+        <line num="331" count="0" type="stmt"/>
+        <line num="337" count="0" type="stmt"/>
+        <line num="344" count="0" type="stmt"/>
+        <line num="345" count="0" type="stmt"/>
+        <line num="357" count="0" type="stmt"/>
+        <line num="364" count="0" type="stmt"/>
+        <line num="369" count="0" type="stmt"/>
+        <line num="370" count="0" type="stmt"/>
+        <line num="382" count="0" type="stmt"/>
+        <line num="386" count="0" type="stmt"/>
+      </file>
+      <file name="tenancy.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\tenancy\tenancy.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="22" count="0" type="stmt"/>
+      </file>
+      <file name="tenant-context.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\tenancy\tenant-context.service.ts">
+        <metrics statements="6" coveredstatements="6" conditionals="6" coveredconditionals="5" methods="2" coveredmethods="2"/>
+        <line num="7" count="2" type="stmt"/>
+        <line num="9" count="3" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="24" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="28" count="2" type="stmt"/>
+      </file>
+      <file name="tenant-membership.guard.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\tenancy\tenant-membership.guard.ts">
+        <metrics statements="15" coveredstatements="15" conditionals="18" coveredconditionals="16" methods="2" coveredmethods="2"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="20" count="4" type="stmt"/>
+        <line num="22" count="4" type="stmt"/>
+        <line num="30" count="4" type="stmt"/>
+        <line num="35" count="4" type="stmt"/>
+        <line num="37" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="41" count="1" type="stmt"/>
+        <line num="46" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="50" count="1" type="stmt"/>
+        <line num="56" count="2" type="stmt"/>
+        <line num="60" count="2" type="stmt"/>
+        <line num="65" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="66" count="1" type="stmt"/>
+        <line num="71" count="1" type="stmt"/>
+        <line num="73" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.users">
+      <metrics statements="20" coveredstatements="14" conditionals="26" coveredconditionals="16" methods="4" coveredmethods="2"/>
+      <file name="users.controller.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\users\users.controller.ts">
+        <metrics statements="5" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="2" coveredmethods="0"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="13" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="17" count="0" type="stmt"/>
+        <line num="21" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+      </file>
+      <file name="users.module.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\users\users.module.ts">
+        <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="13" count="0" type="stmt"/>
+      </file>
+      <file name="users.service.ts" path="C:\Users\Lenovo\Documents\opsdesk\apps\api\src\users\users.service.ts">
+        <metrics statements="14" coveredstatements="14" conditionals="22" coveredconditionals="16" methods="2" coveredmethods="2"/>
+        <line num="12" count="2" type="stmt"/>
+        <line num="14" count="4" type="cond" truecount="6" falsecount="2"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="19" count="4" type="stmt"/>
+        <line num="24" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="30" count="3" type="stmt"/>
+        <line num="33" count="3" type="stmt"/>
+        <line num="39" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="1" type="stmt"/>
+        <line num="53" count="2" type="stmt"/>
+        <line num="59" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="60" count="1" type="stmt"/>
+        <line num="65" count="1" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
