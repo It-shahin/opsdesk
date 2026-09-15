@@ -40,11 +40,8 @@ export class InvitationsService {
         'base64url',
       );
 
-    const tokenHash = createHash(
-      'sha256',
-    )
-      .update(token)
-      .digest('hex');
+    const tokenHash =
+        this.hashToken(token);
 
     const now = new Date();
 
@@ -174,6 +171,14 @@ export class InvitationsService {
       acceptanceToken: token,
     };
   }
+
+    private hashToken(
+        token: string,
+     ): string {
+    return createHash('sha256')
+    .update(token)
+    .digest('hex');
+}
 
   async list(
     organizationId: string,
@@ -307,6 +312,177 @@ export class InvitationsService {
       canceled,
     );
   }
+
+  async accept(
+  user: {
+    id: string;
+    email: string;
+  },
+  token: string,
+) {
+  const tokenHash =
+    this.hashToken(token);
+
+  const normalizedEmail =
+    user.email.trim().toLowerCase();
+
+  const now = new Date();
+
+  return this.prisma.$transaction(
+    async (transaction) => {
+      const invitation =
+        await transaction.invitation.findUnique({
+          where: {
+            tokenHash,
+          },
+
+          select: {
+            id: true,
+            organizationId: true,
+            email: true,
+            role: true,
+            expiresAt: true,
+            acceptedAt: true,
+            canceledAt: true,
+
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        });
+
+      if (!invitation) {
+        throw new NotFoundException(
+          'Invitation not found',
+        );
+      }
+
+      if (
+        invitation.email.toLowerCase() !==
+        normalizedEmail
+      ) {
+        throw new ForbiddenException(
+          'Invitation does not belong to the authenticated user',
+        );
+      }
+
+      if (invitation.acceptedAt) {
+        throw new ConflictException(
+          'Invitation has already been accepted',
+        );
+      }
+
+      if (invitation.canceledAt) {
+        throw new ConflictException(
+          'Invitation has been canceled',
+        );
+      }
+
+      if (
+        invitation.expiresAt <= now
+      ) {
+        throw new ConflictException(
+          'Invitation has expired',
+        );
+      }
+
+      const existingMembership =
+        await transaction.membership.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: user.id,
+              organizationId:
+                invitation.organizationId,
+            },
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (existingMembership) {
+        throw new ConflictException(
+          'User is already a member of this organization',
+        );
+      }
+
+      const claimed =
+        await transaction.invitation.updateMany({
+          where: {
+            id: invitation.id,
+            acceptedAt: null,
+            canceledAt: null,
+
+            expiresAt: {
+              gt: now,
+            },
+          },
+
+          data: {
+            acceptedAt: now,
+            acceptedByUserId:
+              user.id,
+          },
+        });
+
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'Invitation is no longer available',
+        );
+      }
+
+      const membership =
+        await transaction.membership.create({
+          data: {
+            userId: user.id,
+            organizationId:
+              invitation.organizationId,
+            role: invitation.role,
+          },
+
+          select: {
+            id: true,
+            role: true,
+            createdAt: true,
+
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        });
+
+      return {
+        membership: {
+          id: membership.id,
+          role: membership.role,
+          createdAt:
+            membership.createdAt,
+        },
+
+        organization:
+          membership.organization,
+
+        invitation: {
+          id: invitation.id,
+          acceptedAt: now,
+        },
+      };
+    },
+    {
+      isolationLevel:
+        'Serializable',
+    },
+  );
+}
 
   private assertRoleAllowed(
     actorRole: Role,

@@ -5,6 +5,7 @@ import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { InvitationsController } from './invitations.controller.js';
 import { InvitationsService } from './invitations.service.js';
+import { InvitationAcceptanceController } from './invitation-acceptance.controller.js';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { InvitationsService } from './invitations.service.js';
 
   controllers: [
     InvitationsController,
+    InvitationAcceptanceController,
   ],
 
   providers: [
