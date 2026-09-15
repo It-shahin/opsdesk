@@ -33,6 +33,32 @@ type InvitationRecord = {
   };
 };
 
+type AcceptanceInvitationRecord = {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: Role;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+  canceledAt: Date | null;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+};
+
+type MembershipRecord = {
+  id: string;
+  role: Role;
+  createdAt: Date;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+};
+
 describe('InvitationsService', () => {
   let service: InvitationsService;
 
@@ -46,6 +72,11 @@ describe('InvitationsService', () => {
       (args: unknown) =>
         Promise<{ id: string } | null>
     >();
+  const membershipCreateMock =
+    jest.fn<
+      (args: unknown) =>
+        Promise<MembershipRecord>
+    >();
   const pendingFindFirstMock =
     jest.fn<
       (args: unknown) =>
@@ -55,6 +86,16 @@ describe('InvitationsService', () => {
     jest.fn<
       (args: unknown) =>
         Promise<InvitationRecord>
+    >();
+  const invitationFindUniqueMock =
+    jest.fn<
+      (args: unknown) =>
+        Promise<AcceptanceInvitationRecord | null>
+    >();
+  const invitationUpdateManyMock =
+    jest.fn<
+      (args: unknown) =>
+        Promise<{ count: number }>
     >();
   const findManyMock =
     jest.fn<
@@ -79,11 +120,17 @@ describe('InvitationsService', () => {
     membership: {
       findUnique:
         membershipFindUniqueMock,
+      create:
+        membershipCreateMock,
     },
     invitation: {
       findFirst:
         pendingFindFirstMock,
+      findUnique:
+        invitationFindUniqueMock,
       create: createMock,
+      updateMany:
+        invitationUpdateManyMock,
     },
   };
 
@@ -165,6 +212,19 @@ describe('InvitationsService', () => {
       async (callback) =>
         callback(transactionClient),
     );
+
+    userFindUniqueMock.mockResolvedValue(
+      null,
+    );
+    membershipFindUniqueMock.mockResolvedValue(
+      null,
+    );
+    pendingFindFirstMock.mockResolvedValue(
+      null,
+    );
+    invitationUpdateManyMock.mockResolvedValue({
+      count: 1,
+    });
 
     service = new InvitationsService(
       prisma as unknown as PrismaService,
@@ -524,6 +584,277 @@ describe('InvitationsService', () => {
     expect(result).toEqual({
       ...canceledInvitation,
       status: 'CANCELED',
+    });
+  });
+
+  describe('accept', () => {
+    const rawToken =
+      'this-is-a-secure-test-token-with-enough-length';
+
+    const invitedUser = {
+      id:
+        '99999999-9999-4999-8999-999999999999',
+      email:
+        'invited@example.com',
+    };
+
+    const organization = {
+      id: owner.organizationId,
+      name: 'OpsDesk Demo',
+      slug: 'opsdesk-demo',
+    };
+
+    const pendingInvitation =
+      (): AcceptanceInvitationRecord => ({
+        id: invitation.id,
+        organizationId:
+          owner.organizationId,
+        email:
+          invitedUser.email,
+        role: 'AGENT',
+        expiresAt: new Date(
+          Date.now() +
+            24 * 60 * 60 * 1000,
+        ),
+        acceptedAt: null,
+        canceledAt: null,
+        organization,
+      });
+
+    it('accepts a valid invitation and creates a membership', async () => {
+      invitationFindUniqueMock.mockResolvedValue(
+        pendingInvitation(),
+      );
+
+      const createdAt = new Date();
+      membershipCreateMock.mockResolvedValue({
+        id: 'new-membership',
+        role: 'AGENT',
+        createdAt,
+        organization,
+      });
+
+      const result = await service.accept(
+        invitedUser,
+        rawToken,
+      );
+
+      const expectedHash =
+        createHash('sha256')
+          .update(rawToken)
+          .digest('hex');
+
+      expect(
+        invitationFindUniqueMock,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tokenHash:
+              expectedHash,
+          },
+        }),
+      );
+
+      expect(
+        invitationUpdateManyMock,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where:
+            expect.objectContaining({
+              id: invitation.id,
+              acceptedAt: null,
+              canceledAt: null,
+            }),
+          data:
+            expect.objectContaining({
+              acceptedByUserId:
+                invitedUser.id,
+            }),
+        }),
+      );
+
+      expect(
+        membershipCreateMock,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            userId:
+              invitedUser.id,
+            organizationId:
+              owner.organizationId,
+            role: 'AGENT',
+          },
+        }),
+      );
+
+      expect(result).toEqual({
+        membership: {
+          id: 'new-membership',
+          role: 'AGENT',
+          createdAt,
+        },
+        organization,
+        invitation: {
+          id: invitation.id,
+          acceptedAt:
+            expect.any(Date),
+        },
+      });
+    });
+
+    it('rejects the wrong authenticated email', async () => {
+      invitationFindUniqueMock.mockResolvedValue(
+        pendingInvitation(),
+      );
+
+      await expect(
+        service.accept(
+          {
+            ...invitedUser,
+            email:
+              'attacker@example.com',
+          },
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(
+        invitationUpdateManyMock,
+      ).not.toHaveBeenCalled();
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already accepted invitation', async () => {
+      invitationFindUniqueMock.mockResolvedValue({
+        ...pendingInvitation(),
+        acceptedAt: new Date(),
+      });
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a canceled invitation', async () => {
+      invitationFindUniqueMock.mockResolvedValue({
+        ...pendingInvitation(),
+        canceledAt: new Date(),
+      });
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired invitation', async () => {
+      invitationFindUniqueMock.mockResolvedValue({
+        ...pendingInvitation(),
+        expiresAt: new Date(
+          Date.now() -
+            24 * 60 * 60 * 1000,
+        ),
+      });
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects acceptance when the user is already a member', async () => {
+      invitationFindUniqueMock.mockResolvedValue(
+        pendingInvitation(),
+      );
+      membershipFindUniqueMock.mockResolvedValue({
+        id: 'existing-membership',
+      });
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(
+        invitationUpdateManyMock,
+      ).not.toHaveBeenCalled();
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token that loses the acceptance race', async () => {
+      invitationFindUniqueMock.mockResolvedValue(
+        pendingInvitation(),
+      );
+      invitationUpdateManyMock.mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for an invalid token', async () => {
+      invitationFindUniqueMock.mockResolvedValue(
+        null,
+      );
+
+      await expect(
+        service.accept(
+          invitedUser,
+          rawToken,
+        ),
+      ).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+
+      expect(
+        membershipCreateMock,
+      ).not.toHaveBeenCalled();
     });
   });
 });
