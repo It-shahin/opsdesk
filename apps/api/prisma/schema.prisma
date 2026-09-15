@@ -18,15 +18,17 @@ enum Role {
 }
 
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
-  authProviderId String       @unique
-  email          String       @unique
-  name           String?
-  avatarUrl      String?
-  memberships    Membership[]
+  id                  String       @id @default(uuid()) @db.Uuid
+  authProviderId      String       @unique
+  email               String       @unique
+  name                String?
+  avatarUrl           String?
+  memberships         Membership[]
+  invitationsSent     Invitation[] @relation("InvitationInvitedBy")
+  invitationsAccepted Invitation[] @relation("InvitationAcceptedBy")
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
@@ -36,17 +38,18 @@ model Organization {
   name        String
   slug        String       @unique
   memberships Membership[]
+  invitations Invitation[]
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("organizations")
 }
 
 model Membership {
-  id             String       @id @default(uuid()) @db.Uuid
-  userId         String       @db.Uuid
-  organizationId String       @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  organizationId String @db.Uuid
   role           Role
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -58,4 +61,35 @@ model Membership {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@map("memberships")
+}
+
+model Invitation {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  email String
+  role  Role
+
+  tokenHash String @unique
+
+  invitedByUserId  String  @db.Uuid
+  acceptedByUserId String? @db.Uuid
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  canceledAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  invitedBy User @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  acceptedBy User? @relation("InvitationAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, email])
+  @@index([expiresAt])
+  @@map("invitations")
 }

@@ -18,6 +18,7 @@ import { MembershipsModule } from './memberships/memberships.module.js';
 import { TenancyModule } from './tenancy/tenancy.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
 import { MembersModule } from './members/members.module.js';
+import { InvitationsModule } from './invitations/invitations.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -37,7 +38,8 @@ AppModule = __decorate([
             MembershipsModule,
             TenancyModule,
             RbacModule,
-            MembersModule
+            MembersModule,
+            InvitationsModule
         ],
         controllers: [AppController],
         providers: [AppService],
