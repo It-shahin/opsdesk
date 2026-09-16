@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Post,
+  Patch,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
 import { ListCustomersDto } from './dto/list-customers.dto.js';
 import { CustomersService } from './customers.service.js';
+import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 
 import {
   Param,
@@ -116,4 +118,95 @@ async getOne(
       dto,
     );
   }
+
+  @Patch(':customerId')
+  @RequirePermissions(
+    PERMISSIONS.CUSTOMERS_WRITE,
+  )
+  async update(
+    @Req()
+    request: TenantAuthenticatedRequest,
+
+    @Param(
+      'customerId',
+      new ParseUUIDPipe(),
+    )
+    customerId: string,
+
+    @Body()
+    dto: UpdateCustomerDto,
+  ) {
+    const tenant =
+      request.tenant;
+
+    if (!tenant) {
+      throw new ForbiddenException(
+        'Tenant context is required',
+      );
+    }
+
+    return this.customersService.update(
+      tenant,
+      customerId,
+      dto,
+    );
+}
+
+@Post(':customerId/restore')
+@RequirePermissions(
+  PERMISSIONS.CUSTOMERS_WRITE,
+)
+async restore(
+  @Req()
+  request: TenantAuthenticatedRequest,
+
+  @Param(
+    'customerId',
+    new ParseUUIDPipe(),
+  )
+  customerId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.customersService.restore(
+    tenant,
+    customerId,
+  );
+}
+
+@Post(':customerId/archive')
+@RequirePermissions(
+  PERMISSIONS.CUSTOMERS_WRITE,
+)
+async archive(
+  @Req()
+  request: TenantAuthenticatedRequest,
+
+  @Param(
+    'customerId',
+    new ParseUUIDPipe(),
+  )
+  customerId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.customersService.archive(
+    tenant,
+    customerId,
+  );
+}
 }

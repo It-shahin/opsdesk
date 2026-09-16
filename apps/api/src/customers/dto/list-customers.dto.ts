@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -22,6 +23,15 @@ function trimOptional(value: unknown) {
 
 export class ListCustomersDto {
   @Type(() => Number)
+  @IsIn([
+  'active',
+  'archived',
+  'all',
+   ])
+  status:
+    | 'active'
+    | 'archived'
+    | 'all' = 'active';
   @IsInt()
   @Min(1)
   page = 1;

@@ -105,6 +105,8 @@ model Customer {
   company String?
   notes   String?
 
+  archivedAt DateTime?
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -112,6 +114,7 @@ model Customer {
 
   @@index([organizationId])
   @@index([organizationId, email])
+  @@index([organizationId, archivedAt])
   @@index([organizationId, createdAt])
   @@map("customers")
 }

@@ -1,4 +1,7 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   beforeEach,
   describe,
@@ -19,6 +22,7 @@ describe('CustomersService', () => {
 
   const findFirstMock = jest.fn();
   const countMock = jest.fn();
+  const updateMock = jest.fn();
   const transactionMock =
     jest.fn<
       (
@@ -33,6 +37,7 @@ describe('CustomersService', () => {
       findMany: findManyMock,
       findFirst: findFirstMock,
       count: countMock,
+      update: updateMock,
     },
 
     $transaction:
@@ -53,7 +58,7 @@ describe('CustomersService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
 
     transactionMock.mockImplementation(
       async (operations) =>
@@ -139,6 +144,7 @@ describe('CustomersService', () => {
       {
         page: 2,
         limit: 10,
+        status: 'active',
       },
     );
 
@@ -149,6 +155,7 @@ describe('CustomersService', () => {
         where: {
           organizationId:
             tenant.organizationId,
+          archivedAt: null,
         },
         skip: 10,
         take: 10,
@@ -177,6 +184,7 @@ describe('CustomersService', () => {
         page: 1,
         limit: 20,
         search: 'jane',
+        status: 'active',
       },
     );
 
@@ -188,6 +196,7 @@ describe('CustomersService', () => {
           expect.objectContaining({
             organizationId:
               tenant.organizationId,
+            archivedAt: null,
             OR:
               expect.any(Array),
           }),
@@ -231,6 +240,7 @@ describe('CustomersService', () => {
         page: 1,
         limit: 20,
         company: 'acme',
+        status: 'active',
       },
     );
 
@@ -241,12 +251,75 @@ describe('CustomersService', () => {
         where: {
           organizationId:
             tenant.organizationId,
+          archivedAt: null,
           company: {
             contains: 'acme',
             mode: 'insensitive',
           },
         },
       }),
+    );
+  });
+
+  it('lists only archived customers when requested', async () => {
+    findManyMock.mockResolvedValue(
+      [],
+    );
+    countMock.mockResolvedValue(0);
+
+    await service.list(
+      tenant.organizationId,
+      {
+        page: 1,
+        limit: 20,
+        status: 'archived',
+      },
+    );
+
+    expect(
+      findManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where:
+          expect.objectContaining({
+            organizationId:
+              tenant.organizationId,
+            archivedAt: {
+              not: null,
+            },
+          }),
+      }),
+    );
+  });
+
+  it('lists active and archived customers without an archive constraint', async () => {
+    findManyMock.mockResolvedValue(
+      [],
+    );
+    countMock.mockResolvedValue(0);
+
+    await service.list(
+      tenant.organizationId,
+      {
+        page: 1,
+        limit: 20,
+        status: 'all',
+      },
+    );
+
+    const call =
+      findManyMock.mock.calls[0]?.[0] as {
+        where: Record<string, unknown>;
+      };
+
+    expect(call.where).toEqual(
+      expect.objectContaining({
+        organizationId:
+          tenant.organizationId,
+      }),
+    );
+    expect(call.where).not.toHaveProperty(
+      'archivedAt',
     );
   });
 
@@ -283,6 +356,29 @@ describe('CustomersService', () => {
     );
   });
 
+  it('rejects duplicate active customer emails inside the same tenant', async () => {
+    findFirstMock.mockResolvedValue({
+      id: 'existing-customer',
+    });
+
+    await expect(
+      service.create(
+        tenant,
+        {
+          name: 'Another Jane',
+          email:
+            'jane@example.com',
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      createMock,
+    ).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the customer is not inside the tenant', async () => {
     findFirstMock.mockResolvedValue(
       null,
@@ -296,5 +392,128 @@ describe('CustomersService', () => {
     ).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('updates a customer only after resolving it inside the tenant', async () => {
+    findFirstMock.mockResolvedValueOnce({
+      id: 'customer-1',
+      email: 'old@example.com',
+      archivedAt: null,
+    });
+
+    updateMock.mockResolvedValue({
+      id: 'customer-1',
+      name: 'Updated Customer',
+    });
+
+    const result = await service.update(
+      tenant,
+      'customer-1',
+      {
+        name: 'Updated Customer',
+      },
+    );
+
+    expect(
+      findFirstMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'customer-1',
+          organizationId:
+            tenant.organizationId,
+        },
+      }),
+    );
+
+    expect(result).toEqual({
+      id: 'customer-1',
+      name: 'Updated Customer',
+    });
+  });
+
+  it('prevents updates to archived customers', async () => {
+    findFirstMock.mockResolvedValue({
+      id: 'customer-1',
+      email: 'jane@example.com',
+      archivedAt: new Date(),
+    });
+
+    await expect(
+      service.update(
+        tenant,
+        'customer-1',
+        {
+          name: 'Changed',
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      updateMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('archives a customer instead of deleting it', async () => {
+    findFirstMock.mockResolvedValue({
+      id: 'customer-1',
+      archivedAt: null,
+    });
+
+    updateMock.mockResolvedValue({
+      id: 'customer-1',
+      archivedAt: new Date(),
+    });
+
+    const result = await service.archive(
+      tenant,
+      'customer-1',
+    );
+
+    expect(
+      updateMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'customer-1',
+        },
+        data: {
+          archivedAt:
+            expect.any(Date),
+        },
+      }),
+    );
+
+    expect(result.archivedAt).toEqual(
+      expect.any(Date),
+    );
+  });
+
+  it('prevents restoring a customer when its email is now used by an active customer', async () => {
+    findFirstMock
+      .mockResolvedValueOnce({
+        id: 'archived-customer',
+        email:
+          'jane@example.com',
+        archivedAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        id: 'active-customer',
+      });
+
+    await expect(
+      service.restore(
+        tenant,
+        'archived-customer',
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      updateMock,
+    ).not.toHaveBeenCalled();
   });
 });
