@@ -15,6 +15,7 @@ import { TenantMembershipGuard } from './tenant-membership.guard.js';
     TenantMembershipGuard,
   ],
   exports: [
+    UsersModule,
     TenantContextService,
     TenantMembershipGuard,
   ],

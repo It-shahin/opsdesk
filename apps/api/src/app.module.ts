@@ -14,6 +14,7 @@ import { TenancyModule } from './tenancy/tenancy.module.js';
 import { RbacModule } from './rbac/rbac.module.js';
 import { MembersModule } from './members/members.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
+import { CustomersModule } from './customers/customers.module.js';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import { InvitationsModule } from './invitations/invitations.module.js';
   TenancyModule,
   RbacModule,
   MembersModule,
-  InvitationsModule
+  InvitationsModule,
+  CustomersModule,
 ],
   controllers: [AppController],
   providers: [AppService],
