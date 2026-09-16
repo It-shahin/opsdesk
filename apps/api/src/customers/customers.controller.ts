@@ -14,7 +14,14 @@ import { RequirePermissions } from '../rbac/require-permissions.decorator.js';
 import { TenantMembershipGuard } from '../tenancy/tenant-membership.guard.js';
 import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types.js';
 import { CreateCustomerDto } from './dto/create-customer.dto.js';
+import { ListCustomersDto } from './dto/list-customers.dto.js';
 import { CustomersService } from './customers.service.js';
+
+import {
+  Param,
+  ParseUUIDPipe,
+  Query,
+} from '@nestjs/common';
 
 @Controller(
   'v1/organizations/:organizationId/customers',
@@ -36,6 +43,9 @@ export class CustomersController {
   async list(
     @Req()
     request: TenantAuthenticatedRequest,
+
+    @Query()
+    query: ListCustomersDto,
   ) {
     const tenant =
       request.tenant;
@@ -48,8 +58,38 @@ export class CustomersController {
 
     return this.customersService.list(
       tenant.organizationId,
+      query,
     );
   }
+
+  @Get(':customerId')
+@RequirePermissions(
+  PERMISSIONS.CUSTOMERS_READ,
+)
+async getOne(
+  @Req()
+  request: TenantAuthenticatedRequest,
+
+  @Param(
+    'customerId',
+    new ParseUUIDPipe(),
+  )
+  customerId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.customersService.findOne(
+    tenant.organizationId,
+    customerId,
+  );
+}
 
   @Post()
   @RequirePermissions(

@@ -41,7 +41,7 @@ async function getContext(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext,
 ) {
   const api =
@@ -59,8 +59,11 @@ export async function GET(
     );
   }
 
+  const url =
+    new URL(request.url);
+
   const response = await fetch(
-    `${api.apiUrl}/v1/organizations/${api.organizationId}/customers`,
+    `${api.apiUrl}/v1/organizations/${api.organizationId}/customers${url.search}`,
     {
       headers: {
         Authorization:
@@ -102,11 +105,14 @@ export async function POST(
     );
   }
 
+  const url =
+    new URL(request.url);
+
   const body: unknown =
     await request.json();
 
   const response = await fetch(
-    `${api.apiUrl}/v1/organizations/${api.organizationId}/customers`,
+    `${api.apiUrl}/v1/organizations/${api.organizationId}/customers${url.search}`,
     {
       method: 'POST',
 
