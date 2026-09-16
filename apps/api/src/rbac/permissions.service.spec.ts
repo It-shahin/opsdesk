@@ -82,4 +82,30 @@ describe('PermissionsService', () => {
       ),
     ).toBe(false);
   });
+
+  it('allows agents to manage customers', () => {
+    expect(
+      service.hasPermission(
+        'AGENT',
+        PERMISSIONS.CUSTOMERS_WRITE,
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps viewers read-only for customers', () => {
+    expect(
+      service.hasPermission(
+        'VIEWER',
+        PERMISSIONS.CUSTOMERS_READ,
+      ),
+    ).toBe(true);
+
+    expect(
+      service.hasPermission(
+        'VIEWER',
+        PERMISSIONS.CUSTOMERS_WRITE,
+      ),
+    ).toBe(false);
+  });
 });
+
