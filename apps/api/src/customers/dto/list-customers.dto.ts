@@ -22,16 +22,17 @@ function trimOptional(value: unknown) {
 }
 
 export class ListCustomersDto {
-  @Type(() => Number)
   @IsIn([
-  'active',
-  'archived',
-  'all',
-   ])
+    'active',
+    'archived',
+    'all',
+  ])
   status:
     | 'active'
     | 'archived'
     | 'all' = 'active';
+
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   page = 1;

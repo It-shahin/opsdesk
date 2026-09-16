@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   Post,
   Patch,
   Req,
@@ -153,6 +154,7 @@ async getOne(
 }
 
 @Post(':customerId/restore')
+@HttpCode(200)
 @RequirePermissions(
   PERMISSIONS.CUSTOMERS_WRITE,
 )
@@ -182,6 +184,7 @@ async restore(
 }
 
 @Post(':customerId/archive')
+@HttpCode(200)
 @RequirePermissions(
   PERMISSIONS.CUSTOMERS_WRITE,
 )
