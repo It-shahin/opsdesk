@@ -17,6 +17,25 @@ enum Role {
   VIEWER
 }
 
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketSource {
+  MANUAL
+  EMAIL
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -40,6 +59,7 @@ model Organization {
   memberships Membership[]
   invitations Invitation[]
   customers   Customer[]
+  tickets     Ticket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,6 +129,8 @@ model Customer {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  tickets Ticket[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -117,4 +139,31 @@ model Customer {
   @@index([organizationId, archivedAt])
   @@index([organizationId, createdAt])
   @@map("customers")
+}
+
+model Ticket {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  customerId     String @db.Uuid
+
+  subject     String
+  description String?
+
+  status   TicketStatus   @default(OPEN)
+  priority TicketPriority @default(NORMAL)
+  source   TicketSource   @default(MANUAL)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([organizationId, customerId])
+  @@index([organizationId, createdAt])
+  @@map("tickets")
 }
