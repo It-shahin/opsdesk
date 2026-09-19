@@ -3,6 +3,9 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -15,6 +18,8 @@ import { TenantMembershipGuard } from '../tenancy/tenant-membership.guard.js';
 import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { TicketsService } from './tickets.service.js';
+import { UpdateTicketDto } from './dto/update-ticket.dto.js';
+import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 
 @Controller(
   'v1/organizations/:organizationId/tickets',
@@ -78,4 +83,104 @@ export class TicketsController {
       dto,
     );
   }
+
+    @Get(':ticketId')
+    @RequirePermissions(
+    PERMISSIONS.TICKETS_READ,
+    )
+    async getOne(
+    @Req()
+    request:
+        TenantAuthenticatedRequest,
+
+    @Param(
+        'ticketId',
+        new ParseUUIDPipe(),
+    )
+    ticketId: string,
+    ) {
+    const tenant =
+        request.tenant;
+
+    if (!tenant) {
+        throw new ForbiddenException(
+        'Tenant context is required',
+        );
+    }
+
+    return this.ticketsService.findOne(
+        tenant.organizationId,
+        ticketId,
+    );
+}
+
+@Patch(':ticketId')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async update(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Body()
+  dto: UpdateTicketDto,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.update(
+    tenant,
+    ticketId,
+    dto,
+  );
+}
+
+@Patch(':ticketId/status')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async updateStatus(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Body()
+  dto:
+    UpdateTicketStatusDto,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService
+    .updateStatus(
+      tenant,
+      ticketId,
+      dto.status,
+    );
+}
 }

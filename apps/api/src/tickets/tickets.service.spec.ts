@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -26,6 +27,40 @@ describe('TicketsService', () => {
   const ticketFindManyMock =
     jest.fn();
 
+  const ticketFindFirstMock =
+    jest.fn();
+
+  const ticketUpdateMock =
+    jest.fn();
+
+  const transactionTicketFindFirstMock =
+    jest.fn();
+
+  const transactionTicketUpdateManyMock =
+    jest.fn();
+
+  const transactionClient = {
+    ticket: {
+      findFirst:
+        transactionTicketFindFirstMock,
+
+      updateMany:
+        transactionTicketUpdateManyMock,
+    },
+  };
+
+  type TransactionCallback = (
+    transaction:
+      typeof transactionClient,
+  ) => unknown;
+
+  const transactionMock =
+    jest.fn<
+      (
+        callback: TransactionCallback,
+      ) => Promise<unknown>
+    >();
+
   const prisma = {
     customer: {
       findFirst:
@@ -38,7 +73,16 @@ describe('TicketsService', () => {
 
       findMany:
         ticketFindManyMock,
+
+      findFirst:
+        ticketFindFirstMock,
+
+      update:
+        ticketUpdateMock,
     },
+
+    $transaction:
+      transactionMock,
   };
 
   const tenant: TenantContext = {
@@ -58,7 +102,12 @@ describe('TicketsService', () => {
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+
+    transactionMock.mockImplementation(
+      async (callback) =>
+        callback(transactionClient),
+    );
 
     service =
       new TicketsService(
@@ -246,6 +295,184 @@ describe('TicketsService', () => {
 
         take: 50,
       }),
+    );
+  });
+
+  it('finds a ticket only inside the tenant', async () => {
+    const ticketId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    ticketFindFirstMock.mockResolvedValue({
+      id: ticketId,
+      status: 'OPEN',
+    });
+
+    await service.findOne(
+      tenant.organizationId,
+      ticketId,
+    );
+
+    expect(
+      ticketFindFirstMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: ticketId,
+          organizationId:
+            tenant.organizationId,
+        },
+      }),
+    );
+  });
+
+  it('returns 404 when the ticket is not inside the tenant', async () => {
+    ticketFindFirstMock.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.findOne(
+        tenant.organizationId,
+        'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('resolves an open ticket', async () => {
+    const ticketId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    transactionTicketFindFirstMock
+      .mockResolvedValueOnce({
+        id: ticketId,
+        status: 'OPEN',
+      })
+      .mockResolvedValueOnce({
+        id: ticketId,
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+        closedAt: null,
+      });
+
+    transactionTicketUpdateManyMock
+      .mockResolvedValue({
+        count: 1,
+      });
+
+    const result =
+      await service.updateStatus(
+        tenant,
+        ticketId,
+        'RESOLVED',
+      );
+
+    expect(
+      transactionTicketUpdateManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: ticketId,
+          organizationId:
+            tenant.organizationId,
+          status: 'OPEN',
+        },
+        data:
+          expect.objectContaining({
+            status: 'RESOLVED',
+            resolvedAt:
+              expect.any(Date),
+            closedAt: null,
+          }),
+      }),
+    );
+
+    expect(result.status).toBe(
+      'RESOLVED',
+    );
+  });
+
+  it('rejects invalid status transitions', async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    await expect(
+      service.updateStatus(
+        tenant,
+        'ticket-1',
+        'CLOSED',
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      transactionTicketUpdateManyMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('reopens a resolved ticket and clears lifecycle timestamps', async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValueOnce({
+        id: 'ticket-1',
+        status: 'RESOLVED',
+      })
+      .mockResolvedValueOnce({
+        id: 'ticket-1',
+        status: 'OPEN',
+        resolvedAt: null,
+        closedAt: null,
+      });
+
+    transactionTicketUpdateManyMock
+      .mockResolvedValue({
+        count: 1,
+      });
+
+    await service.updateStatus(
+      tenant,
+      'ticket-1',
+      'OPEN',
+    );
+
+    expect(
+      transactionTicketUpdateManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data:
+          expect.objectContaining({
+            status: 'OPEN',
+            resolvedAt: null,
+            closedAt: null,
+          }),
+      }),
+    );
+  });
+
+  it('rejects a concurrent ticket status change', async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    transactionTicketUpdateManyMock
+      .mockResolvedValue({
+        count: 0,
+      });
+
+    await expect(
+      service.updateStatus(
+        tenant,
+        'ticket-1',
+        'PENDING',
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
     );
   });
 });

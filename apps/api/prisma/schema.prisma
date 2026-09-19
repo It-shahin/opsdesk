@@ -153,6 +153,9 @@ model Ticket {
   priority TicketPriority @default(NORMAL)
   source   TicketSource   @default(MANUAL)
 
+  resolvedAt DateTime?
+  closedAt   DateTime?
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
