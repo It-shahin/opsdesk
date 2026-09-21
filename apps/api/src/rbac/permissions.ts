@@ -5,6 +5,9 @@ export const PERMISSIONS = {
 
   CUSTOMERS_READ: 'customers:read',
   CUSTOMERS_WRITE: 'customers:write',
+
+  TICKETS_READ: 'tickets:read',
+  TICKETS_WRITE: 'tickets:write',
 } as const;
 
 export type Permission =

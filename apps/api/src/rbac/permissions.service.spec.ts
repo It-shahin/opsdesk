@@ -107,5 +107,31 @@ describe('PermissionsService', () => {
       ),
     ).toBe(false);
   });
+
+  it('allows agents to manage tickets', () => {
+  expect(
+    service.hasPermission(
+      'AGENT',
+      PERMISSIONS.TICKETS_WRITE,
+    ),
+  ).toBe(true);
 });
+
+it('keeps viewers read-only for tickets', () => {
+  expect(
+    service.hasPermission(
+      'VIEWER',
+      PERMISSIONS.TICKETS_READ,
+    ),
+  ).toBe(true);
+
+  expect(
+    service.hasPermission(
+      'VIEWER',
+      PERMISSIONS.TICKETS_WRITE,
+    ),
+  ).toBe(false);
+});
+});
+
 

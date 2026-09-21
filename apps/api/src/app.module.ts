@@ -15,6 +15,8 @@ import { RbacModule } from './rbac/rbac.module.js';
 import { MembersModule } from './members/members.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
 import { CustomersModule } from './customers/customers.module.js';
+import { TicketsModule } from './tickets/tickets.module.js';
+import { TagsModule } from './tags/tags.module.js';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { CustomersModule } from './customers/customers.module.js';
   MembersModule,
   InvitationsModule,
   CustomersModule,
+  TicketsModule,
+  TagsModule,
 ],
   controllers: [AppController],
   providers: [AppService],
