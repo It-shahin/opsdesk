@@ -20,6 +20,7 @@ import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { TicketsService } from './tickets.service.js';
 import { UpdateTicketDto } from './dto/update-ticket.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
+import { UpdateTicketAssigneeDto } from './dto/update-ticket-assignee.dto.js';
 
 @Controller(
   'v1/organizations/:organizationId/tickets',
@@ -182,5 +183,40 @@ async updateStatus(
       ticketId,
       dto.status,
     );
+}
+
+@Patch(':ticketId/assignee')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async assign(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Body()
+  dto:
+    UpdateTicketAssigneeDto,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.assign(
+    tenant,
+    ticketId,
+    dto.membershipId,
+  );
 }
 }

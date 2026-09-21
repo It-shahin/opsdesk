@@ -464,4 +464,137 @@ private getLifecycleTimestamps(
       };
   }
 }
+
+private assignmentSelect() {
+  return {
+    id: true,
+    subject: true,
+    description: true,
+    status: true,
+    priority: true,
+    source: true,
+    resolvedAt: true,
+    closedAt: true,
+    createdAt: true,
+    updatedAt: true,
+
+    customer: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        company: true,
+      },
+    },
+
+    assignee: {
+      select: {
+        id: true,
+        role: true,
+
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    },
+  } as const;
+}
+
+async assign(
+  tenant: TenantContext,
+  ticketId: string,
+  membershipId: string | null,
+) {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!ticket) {
+    throw new NotFoundException(
+      'Ticket not found',
+    );
+  }
+
+  if (membershipId === null) {
+    return this.prisma.ticket.update({
+      where: {
+        id: ticket.id,
+      },
+
+      data: {
+        assigneeMembershipId:
+          null,
+      },
+
+      select:
+        this.assignmentSelect(),
+    });
+  }
+
+  const membership =
+    await this.prisma.membership.findFirst({
+      where: {
+        id: membershipId,
+
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+        role: true,
+
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+  if (!membership) {
+    throw new NotFoundException(
+      'Assignee not found',
+    );
+  }
+
+  if (
+    membership.role === 'VIEWER'
+  ) {
+    throw new BadRequestException(
+      'Viewers cannot be assigned tickets',
+    );
+  }
+
+  return this.prisma.ticket.update({
+    where: {
+      id: ticket.id,
+    },
+
+    data: {
+      assigneeMembershipId:
+        membership.id,
+    },
+
+    select:
+      this.assignmentSelect(),
+  });
+}
 }

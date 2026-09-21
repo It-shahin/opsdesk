@@ -76,6 +76,8 @@ model Membership {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  assignedTickets Ticket[] @relation("TicketAssignee")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -146,6 +148,8 @@ model Ticket {
   organizationId String @db.Uuid
   customerId     String @db.Uuid
 
+  assigneeMembershipId String? @db.Uuid
+
   subject     String
   description String?
 
@@ -159,6 +163,8 @@ model Ticket {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  assignee Membership? @relation("TicketAssignee", fields: [assigneeMembershipId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

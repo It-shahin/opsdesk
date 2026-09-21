@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
@@ -37,6 +38,9 @@ describe('TicketsService', () => {
     jest.fn();
 
   const transactionTicketUpdateManyMock =
+    jest.fn();
+
+  const membershipFindFirstMock =
     jest.fn();
 
   const transactionClient = {
@@ -79,6 +83,11 @@ describe('TicketsService', () => {
 
       update:
         ticketUpdateMock,
+    },
+
+    membership: {
+      findFirst:
+        membershipFindFirstMock,
     },
 
     $transaction:
@@ -474,5 +483,191 @@ describe('TicketsService', () => {
     ).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+
+  it('assigns a ticket to an agent inside the tenant', async () => {
+    const ticketId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    const membershipId =
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+    ticketFindFirstMock.mockResolvedValue({
+      id: ticketId,
+    });
+
+    membershipFindFirstMock
+      .mockResolvedValue({
+        id: membershipId,
+        role: 'AGENT',
+
+        user: {
+          id: 'user-agent',
+          name: 'Agent',
+          email:
+            'agent@example.com',
+          avatarUrl: null,
+        },
+      });
+
+    ticketUpdateMock.mockResolvedValue({
+      id: ticketId,
+
+      assignee: {
+        id: membershipId,
+        role: 'AGENT',
+      },
+    });
+
+    const result =
+      await service.assign(
+        tenant,
+        ticketId,
+        membershipId,
+      );
+
+    expect(
+      membershipFindFirstMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: membershipId,
+
+          organizationId:
+            tenant.organizationId,
+        },
+      }),
+    );
+
+    expect(
+      ticketUpdateMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: ticketId,
+        },
+
+        data: {
+          assigneeMembershipId:
+            membershipId,
+        },
+      }),
+    );
+
+    expect(result.assignee.id).toBe(
+      membershipId,
+    );
+  });
+
+  it('rejects an assignee outside the tenant', async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+    });
+
+    membershipFindFirstMock
+      .mockResolvedValue(null);
+
+    await expect(
+      service.assign(
+        tenant,
+        'ticket-1',
+        'foreign-membership',
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(
+      ticketUpdateMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('prevents assigning tickets to viewers', async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+    });
+
+    membershipFindFirstMock
+      .mockResolvedValue({
+        id: 'viewer-membership',
+        role: 'VIEWER',
+
+        user: {
+          id: 'viewer-user',
+        },
+      });
+
+    await expect(
+      service.assign(
+        tenant,
+        'ticket-1',
+        'viewer-membership',
+      ),
+    ).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(
+      ticketUpdateMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('unassigns a ticket', async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+    });
+
+    ticketUpdateMock.mockResolvedValue({
+      id: 'ticket-1',
+      assignee: null,
+    });
+
+    const result =
+      await service.assign(
+        tenant,
+        'ticket-1',
+        null,
+      );
+
+    expect(
+      membershipFindFirstMock,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      ticketUpdateMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          assigneeMembershipId:
+            null,
+        },
+      }),
+    );
+
+    expect(result.assignee).toBeNull();
+  });
+
+  it('does not assign an unavailable ticket', async () => {
+    ticketFindFirstMock.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.assign(
+        tenant,
+        'foreign-ticket',
+        'some-membership',
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(
+      membershipFindFirstMock,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      ticketUpdateMock,
+    ).not.toHaveBeenCalled();
   });
 });
