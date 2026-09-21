@@ -11,6 +11,7 @@ import {
   Req,
   UseGuards,
   Delete,
+  Query,
 } from '@nestjs/common';
 
 import { PermissionGuard } from '../rbac/permission.guard.js';
@@ -24,6 +25,7 @@ import { UpdateTicketDto } from './dto/update-ticket.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { UpdateTicketAssigneeDto } from './dto/update-ticket-assignee.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
+import {ListTicketsDto} from './dto/list-tickets.dto.js';
 
 @Controller(
   'v1/organizations/:organizationId/tickets',
@@ -38,28 +40,33 @@ export class TicketsController {
       TicketsService,
   ) {}
 
-  @Get()
-  @RequirePermissions(
-    PERMISSIONS.TICKETS_READ,
-  )
-  async list(
-    @Req()
-    request:
-      TenantAuthenticatedRequest,
-  ) {
-    const tenant =
-      request.tenant;
+ @Get()
+@RequirePermissions(
+  PERMISSIONS.TICKETS_READ,
+)
+async list(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
 
-    if (!tenant) {
-      throw new ForbiddenException(
-        'Tenant context is required',
-      );
-    }
+  @Query()
+  query:
+    ListTicketsDto,
+) {
+  const tenant =
+    request.tenant;
 
-    return this.ticketsService.list(
-      tenant.organizationId,
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
     );
   }
+
+  return this.ticketsService.list(
+    tenant.organizationId,
+    query,
+  );
+}
 
   @Post()
   @RequirePermissions(

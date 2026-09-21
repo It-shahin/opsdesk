@@ -58,6 +58,9 @@ describe('TicketsService', () => {
     const ticketMessageFindManyMock =
       jest.fn();
 
+    const ticketCountMock =
+      jest.fn();
+
   const transactionClient = {
     ticket: {
       findFirst:
@@ -68,17 +71,28 @@ describe('TicketsService', () => {
     },
   };
 
-  type TransactionCallback = (
-    transaction:
-      typeof transactionClient,
-  ) => unknown;
-
   const transactionMock =
-    jest.fn<
-      (
-        callback: TransactionCallback,
-      ) => Promise<unknown>
-    >();
+    jest.fn(
+      async (
+        input:
+          | Promise<unknown>[]
+          | ((
+              tx: typeof transactionClient,
+            ) => Promise<unknown>),
+      ) => {
+        if (
+          Array.isArray(input)
+        ) {
+          return Promise.all(
+            input,
+          );
+        }
+
+        return input(
+          transactionClient,
+        );
+      },
+    );
 
   const prisma = {
     customer: {
@@ -98,6 +112,9 @@ describe('TicketsService', () => {
 
       update:
         ticketUpdateMock,
+
+      count:
+        ticketCountMock,
     },
 
     membership: {
@@ -150,8 +167,15 @@ describe('TicketsService', () => {
     jest.resetAllMocks();
 
     transactionMock.mockImplementation(
-      async (callback) =>
-        callback(transactionClient),
+      async (input) => {
+        if (Array.isArray(input)) {
+          return Promise.all(input);
+        }
+
+        return input(
+          transactionClient,
+        );
+      },
     );
 
     service =
@@ -325,8 +349,17 @@ describe('TicketsService', () => {
     ticketFindManyMock
       .mockResolvedValue([]);
 
+    ticketCountMock
+      .mockResolvedValue(0);
+
     await service.list(
       tenant.organizationId,
+      {
+        page: 1,
+        limit: 50,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      },
     );
 
     expect(
@@ -1129,5 +1162,253 @@ it('lists only messages for the ticket inside the tenant', async () => {
       body: 'Second',
     },
   ]);
+});
+
+it('lists paginated tickets inside the tenant', async () => {
+  ticketFindManyMock
+    .mockResolvedValue([
+      {
+        id:
+          'ticket-1',
+
+        subject:
+          'Login issue',
+
+        tagLinks: [],
+      },
+    ]);
+
+  ticketCountMock
+    .mockResolvedValue(35);
+
+  const result =
+    await service.list(
+      tenant.organizationId,
+      {
+        page: 2,
+        limit: 10,
+        sortBy:
+          'updatedAt',
+        sortOrder:
+          'desc',
+      },
+    );
+
+  expect(
+    ticketFindManyMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: {
+        organizationId:
+          tenant.organizationId,
+      },
+
+      skip: 10,
+      take: 10,
+
+      orderBy: [
+        {
+          updatedAt:
+            'desc',
+        },
+        {
+          id:
+            'desc',
+        },
+      ],
+    }),
+  );
+
+  expect(
+    result.pagination,
+  ).toEqual({
+    page: 2,
+    limit: 10,
+    total: 35,
+    totalPages: 4,
+    hasNextPage: true,
+    hasPreviousPage: true,
+  });
+});
+
+it('combines ticket filters without losing tenant scope', async () => {
+  ticketFindManyMock
+    .mockResolvedValue([]);
+
+  ticketCountMock
+    .mockResolvedValue(0);
+
+  await service.list(
+    tenant.organizationId,
+    {
+      page: 1,
+      limit: 20,
+
+      status: 'OPEN',
+      priority: 'HIGH',
+
+      customerId:
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+
+      assigneeMembershipId:
+        'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+
+      tagId:
+        'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+
+      sortBy:
+        'updatedAt',
+
+      sortOrder:
+        'desc',
+    },
+  );
+
+  expect(
+    ticketFindManyMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where:
+        expect.objectContaining({
+          organizationId:
+            tenant.organizationId,
+
+          status:
+            'OPEN',
+
+          priority:
+            'HIGH',
+
+          customerId:
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+
+          assigneeMembershipId:
+            'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+
+          tagLinks: {
+            some: {
+              tagId:
+                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            },
+          },
+        }),
+    }),
+  );
+});
+
+it('searches tickets and customer data inside the tenant', async () => {
+  ticketFindManyMock
+    .mockResolvedValue([]);
+
+  ticketCountMock
+    .mockResolvedValue(0);
+
+  await service.list(
+    tenant.organizationId,
+    {
+      page: 1,
+      limit: 20,
+
+      search:
+        'jane',
+
+      sortBy:
+        'updatedAt',
+
+      sortOrder:
+        'desc',
+    },
+  );
+
+  const call =
+    ticketFindManyMock
+      .mock.calls[0][0];
+
+  expect(
+    call.where.organizationId,
+  ).toBe(
+    tenant.organizationId,
+  );
+
+  expect(
+    call.where.OR,
+  ).toEqual(
+    expect.arrayContaining([
+      {
+        subject: {
+          contains:
+            'jane',
+
+          mode:
+            'insensitive',
+        },
+      },
+
+      {
+        description: {
+          contains:
+            'jane',
+
+          mode:
+            'insensitive',
+        },
+      },
+    ]),
+  );
+});
+
+it('filters tickets by tag', async () => {
+  ticketFindManyMock
+    .mockResolvedValue([]);
+
+  ticketCountMock
+    .mockResolvedValue(0);
+
+  await service.list(
+    tenant.organizationId,
+    {
+      page: 1,
+      limit: 20,
+
+      tagId:
+        'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+
+      sortBy:
+        'createdAt',
+
+      sortOrder:
+        'asc',
+    },
+  );
+
+  expect(
+    ticketFindManyMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where:
+        expect.objectContaining({
+          organizationId:
+            tenant.organizationId,
+
+          tagLinks: {
+            some: {
+              tagId:
+                'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            },
+          },
+        }),
+
+      orderBy: [
+        {
+          createdAt:
+            'asc',
+        },
+        {
+          id:
+            'asc',
+        },
+      ],
+    }),
+  );
 });
 });

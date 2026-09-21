@@ -42,9 +42,13 @@ async function getApiContext(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext,
 ) {
+
+  const url =
+  new URL(request.url);
+
   const api =
     await getApiContext(
       context,
@@ -64,7 +68,7 @@ export async function GET(
 
   const response =
     await fetch(
-      `${api.apiUrl}/v1/organizations/${api.organizationId}/tickets`,
+      `${api.apiUrl}/v1/organizations/${api.organizationId}/tickets${url.search}`,
       {
         headers: {
           Authorization:
