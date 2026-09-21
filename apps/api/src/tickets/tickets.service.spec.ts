@@ -43,6 +43,15 @@ describe('TicketsService', () => {
   const membershipFindFirstMock =
     jest.fn();
 
+  const tagFindFirstMock =
+    jest.fn();
+
+  const ticketTagUpsertMock =
+    jest.fn();
+
+  const ticketTagDeleteManyMock =
+    jest.fn();
+
   const transactionClient = {
     ticket: {
       findFirst:
@@ -88,6 +97,19 @@ describe('TicketsService', () => {
     membership: {
       findFirst:
         membershipFindFirstMock,
+    },
+
+    tag: {
+      findFirst:
+        tagFindFirstMock,
+    },
+
+    ticketTag: {
+      upsert:
+        ticketTagUpsertMock,
+
+      deleteMany:
+        ticketTagDeleteManyMock,
     },
 
     $transaction:
@@ -669,5 +691,172 @@ describe('TicketsService', () => {
     expect(
       ticketUpdateMock,
     ).not.toHaveBeenCalled();
+  });
+
+  it('adds an organization tag to a ticket', async () => {
+    const ticketId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    const tagId =
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+    ticketFindFirstMock
+      .mockResolvedValueOnce({
+        id: ticketId,
+      })
+      .mockResolvedValueOnce({
+        id: ticketId,
+        subject: 'Issue',
+        tagLinks: [
+          {
+            tag: {
+              id: tagId,
+              name: 'Bug',
+            },
+          },
+        ],
+      });
+
+    tagFindFirstMock.mockResolvedValue({
+      id: tagId,
+    });
+
+    ticketTagUpsertMock
+      .mockResolvedValue({});
+
+    const result =
+      await service.addTag(
+        tenant,
+        ticketId,
+        tagId,
+      );
+
+    expect(
+      tagFindFirstMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: tagId,
+
+          organizationId:
+            tenant.organizationId,
+        },
+      }),
+    );
+
+    expect(
+      ticketTagUpsertMock,
+    ).toHaveBeenCalledWith({
+      where: {
+        ticketId_tagId: {
+          ticketId,
+          tagId,
+        },
+      },
+
+      update: {},
+
+      create: {
+        ticketId,
+        tagId,
+      },
+    });
+
+    expect(result.tags).toEqual([
+      {
+        id: tagId,
+        name: 'Bug',
+      },
+    ]);
+  });
+
+  it('rejects a tag outside the ticket tenant', async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+    });
+
+    tagFindFirstMock.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.addTag(
+        tenant,
+        'ticket-1',
+        'foreign-tag',
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(
+      ticketTagUpsertMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not tag a ticket outside the tenant', async () => {
+    ticketFindFirstMock.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.addTag(
+        tenant,
+        'foreign-ticket',
+        'tag-1',
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(
+      tagFindFirstMock,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      ticketTagUpsertMock,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('removes a ticket tag', async () => {
+    ticketFindFirstMock
+      .mockResolvedValueOnce({
+        id: 'ticket-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'ticket-1',
+        subject: 'Issue',
+        tagLinks: [],
+      });
+
+    tagFindFirstMock.mockResolvedValue({
+      id: 'tag-1',
+    });
+
+    ticketTagDeleteManyMock
+      .mockResolvedValue({
+        count: 1,
+      });
+
+    const result =
+      await service.removeTag(
+        tenant,
+        'ticket-1',
+        'tag-1',
+      );
+
+    expect(
+      ticketTagDeleteManyMock,
+    ).toHaveBeenCalledWith({
+      where: {
+        ticketId:
+          'ticket-1',
+
+        tagId:
+          'tag-1',
+      },
+    });
+
+    expect(result.tags).toEqual([]);
   });
 });

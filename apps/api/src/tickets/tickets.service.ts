@@ -178,6 +178,22 @@ export class TicketsService {
             archivedAt: true,
           },
         },
+        tagLinks: {
+          select: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+
+          orderBy: {
+            tag: {
+              name: 'asc',
+            },
+          },
+        },
       },
     });
 
@@ -187,7 +203,9 @@ export class TicketsService {
     );
   }
 
-  return ticket;
+  return this.mapTicket(
+    ticket,
+  );
 }
 
 async update(
@@ -596,5 +614,170 @@ async assign(
     select:
       this.assignmentSelect(),
   });
+}
+
+async addTag(
+  tenant: TenantContext,
+  ticketId: string,
+  tagId: string,
+) {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!ticket) {
+    throw new NotFoundException(
+      'Ticket not found',
+    );
+  }
+
+  const tag =
+    await this.prisma.tag.findFirst({
+      where: {
+        id: tagId,
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!tag) {
+    throw new NotFoundException(
+      'Tag not found',
+    );
+  }
+
+  await this.prisma.ticketTag.upsert({
+    where: {
+      ticketId_tagId: {
+        ticketId:
+          ticket.id,
+
+        tagId:
+          tag.id,
+      },
+    },
+
+    update: {},
+
+    create: {
+      ticketId:
+        ticket.id,
+
+      tagId:
+        tag.id,
+    },
+  });
+
+  return this.findOne(
+    tenant.organizationId,
+    ticket.id,
+  );
+}
+
+async removeTag(
+  tenant: TenantContext,
+  ticketId: string,
+  tagId: string,
+) {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!ticket) {
+    throw new NotFoundException(
+      'Ticket not found',
+    );
+  }
+
+  const tag =
+    await this.prisma.tag.findFirst({
+      where: {
+        id: tagId,
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!tag) {
+    throw new NotFoundException(
+      'Tag not found',
+    );
+  }
+
+  await this.prisma.ticketTag.deleteMany({
+    where: {
+      ticketId:
+        ticket.id,
+
+      tagId:
+        tag.id,
+    },
+  });
+
+  return this.findOne(
+    tenant.organizationId,
+    ticket.id,
+  );
+}
+
+private mapTicket<
+  T extends {
+    tagLinks?: Array<{
+      tag: {
+        id: string;
+        name: string;
+      };
+    }>;
+  },
+>(
+  ticket: T,
+) {
+  if (
+    !('tagLinks' in ticket) ||
+    !ticket.tagLinks
+  ) {
+    return ticket;
+  }
+
+  const {
+    tagLinks,
+    ...rest
+  } = ticket;
+
+  return {
+    ...rest,
+
+    tags:
+      tagLinks.map(
+        ({ tag }) =>
+          tag,
+      ),
+  };
 }
 }

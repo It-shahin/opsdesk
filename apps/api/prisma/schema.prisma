@@ -60,6 +60,7 @@ model Organization {
   invitations Invitation[]
   customers   Customer[]
   tickets     Ticket[]
+  tags        Tag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,6 +161,8 @@ model Ticket {
   resolvedAt DateTime?
   closedAt   DateTime?
 
+  tagLinks TicketTag[]
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -175,4 +178,38 @@ model Ticket {
   @@index([organizationId, customerId])
   @@index([organizationId, createdAt])
   @@map("tickets")
+}
+
+model Tag {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  name           String
+  normalizedName String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ticketLinks TicketTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, normalizedName])
+  @@index([organizationId])
+  @@map("tags")
+}
+
+model TicketTag {
+  ticketId String @db.Uuid
+  tagId    String @db.Uuid
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([ticketId, tagId])
+  @@index([tagId])
+  @@map("ticket_tags")
 }

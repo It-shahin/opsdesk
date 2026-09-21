@@ -3,12 +3,14 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Req,
   UseGuards,
+  Delete,
 } from '@nestjs/common';
 
 import { PermissionGuard } from '../rbac/permission.guard.js';
@@ -217,6 +219,81 @@ async assign(
     tenant,
     ticketId,
     dto.membershipId,
+  );
+}
+
+@Post(':ticketId/tags/:tagId')
+@HttpCode(200)
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async addTag(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Param(
+    'tagId',
+    new ParseUUIDPipe(),
+  )
+  tagId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.addTag(
+    tenant,
+    ticketId,
+    tagId,
+  );
+}
+
+@Delete(':ticketId/tags/:tagId')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async removeTag(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Param(
+    'tagId',
+    new ParseUUIDPipe(),
+  )
+  tagId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.removeTag(
+    tenant,
+    ticketId,
+    tagId,
   );
 }
 }
