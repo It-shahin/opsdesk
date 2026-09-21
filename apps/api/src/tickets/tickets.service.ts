@@ -780,4 +780,154 @@ private mapTicket<
       ),
   };
 }
+
+private messageSelect() {
+  return {
+    id: true,
+    kind: true,
+    authorType: true,
+    source: true,
+    body: true,
+    createdAt: true,
+    updatedAt: true,
+
+    authorMembership: {
+      select: {
+        id: true,
+        role: true,
+
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    },
+  } as const;
+}
+
+async createMessage(
+  tenant: TenantContext,
+  ticketId: string,
+  input: {
+    kind:
+      | 'PUBLIC_REPLY'
+      | 'INTERNAL_NOTE';
+
+    body: string;
+  },
+) {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+
+        organizationId:
+          tenant.organizationId,
+      },
+
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+  if (!ticket) {
+    throw new NotFoundException(
+      'Ticket not found',
+    );
+  }
+
+  if (
+    input.kind ===
+      'PUBLIC_REPLY' &&
+    ticket.status === 'CLOSED'
+  ) {
+    throw new ConflictException(
+      'Closed tickets must be reopened before sending a public reply',
+    );
+  }
+
+  return this.prisma.ticketMessage.create({
+    data: {
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        ticket.id,
+
+      authorMembershipId:
+        tenant.membershipId,
+
+      kind:
+        input.kind,
+
+      authorType:
+        'MEMBER',
+
+      source:
+        'MANUAL',
+
+      body:
+        input.body,
+    },
+
+    select:
+      this.messageSelect(),
+  });
+}
+
+async listMessages(
+  organizationId: string,
+  ticketId: string,
+) {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!ticket) {
+    throw new NotFoundException(
+      'Ticket not found',
+    );
+  }
+
+  const messages =
+    await this.prisma.ticketMessage.findMany({
+      where: {
+        organizationId,
+        ticketId:
+          ticket.id,
+      },
+
+      select:
+        this.messageSelect(),
+
+      orderBy: [
+        {
+          createdAt: 'desc',
+        },
+        {
+          id: 'desc',
+        },
+      ],
+
+      // Return the latest conversation history.
+      // Proper message cursor pagination can
+      // be introduced later if required.
+      take: 100,
+    });
+
+  return messages.reverse();
+}
 }

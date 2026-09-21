@@ -52,6 +52,12 @@ describe('TicketsService', () => {
   const ticketTagDeleteManyMock =
     jest.fn();
 
+    const ticketMessageCreateMock =
+      jest.fn();
+
+    const ticketMessageFindManyMock =
+      jest.fn();
+
   const transactionClient = {
     ticket: {
       findFirst:
@@ -110,6 +116,14 @@ describe('TicketsService', () => {
 
       deleteMany:
         ticketTagDeleteManyMock,
+    },
+
+    ticketMessage: {
+      create:
+        ticketMessageCreateMock,
+
+      findMany:
+        ticketMessageFindManyMock,
     },
 
     $transaction:
@@ -859,4 +873,261 @@ describe('TicketsService', () => {
 
     expect(result.tags).toEqual([]);
   });
+
+  it('creates a public member reply', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue({
+      id: 'ticket-1',
+      status: 'OPEN',
+    });
+
+  ticketMessageCreateMock
+    .mockResolvedValue({
+      id: 'message-1',
+
+      kind:
+        'PUBLIC_REPLY',
+
+      authorType:
+        'MEMBER',
+
+      source:
+        'MANUAL',
+
+      body:
+        'We are looking into this.',
+    });
+
+  const result =
+    await service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind:
+          'PUBLIC_REPLY',
+
+        body:
+          'We are looking into this.',
+      },
+    );
+
+  expect(
+    ticketMessageCreateMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: {
+        organizationId:
+          tenant.organizationId,
+
+        ticketId:
+          'ticket-1',
+
+        authorMembershipId:
+          tenant.membershipId,
+
+        kind:
+          'PUBLIC_REPLY',
+
+        authorType:
+          'MEMBER',
+
+        source:
+          'MANUAL',
+
+        body:
+          'We are looking into this.',
+      },
+    }),
+  );
+
+  expect(
+    result.authorType,
+  ).toBe('MEMBER');
+});
+
+it('creates an internal note', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue({
+      id: 'ticket-1',
+      status: 'OPEN',
+    });
+
+  ticketMessageCreateMock
+    .mockResolvedValue({
+      id: 'message-1',
+      kind:
+        'INTERNAL_NOTE',
+      authorType:
+        'MEMBER',
+      source:
+        'MANUAL',
+      body:
+        'Customer called twice today.',
+    });
+
+  await service.createMessage(
+    tenant,
+    'ticket-1',
+    {
+      kind:
+        'INTERNAL_NOTE',
+
+      body:
+        'Customer called twice today.',
+    },
+  );
+
+  expect(
+    ticketMessageCreateMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data:
+        expect.objectContaining({
+          kind:
+            'INTERNAL_NOTE',
+
+          authorMembershipId:
+            tenant.membershipId,
+        }),
+    }),
+  );
+});
+
+it('rejects public replies on closed tickets', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue({
+      id: 'ticket-1',
+      status: 'CLOSED',
+    });
+
+  await expect(
+    service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind:
+          'PUBLIC_REPLY',
+
+        body:
+          'New response',
+      },
+    ),
+  ).rejects.toBeInstanceOf(
+    ConflictException,
+  );
+
+  expect(
+    ticketMessageCreateMock,
+  ).not.toHaveBeenCalled();
+});
+
+it('allows internal notes on closed tickets', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue({
+      id: 'ticket-1',
+      status: 'CLOSED',
+    });
+
+  ticketMessageCreateMock
+    .mockResolvedValue({
+      id: 'message-1',
+      kind:
+        'INTERNAL_NOTE',
+    });
+
+  await service.createMessage(
+    tenant,
+    'ticket-1',
+    {
+      kind:
+        'INTERNAL_NOTE',
+
+      body:
+        'Post-resolution review.',
+    },
+  );
+
+  expect(
+    ticketMessageCreateMock,
+  ).toHaveBeenCalled();
+});
+
+it('does not create messages on tickets outside the tenant', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue(null);
+
+  await expect(
+    service.createMessage(
+      tenant,
+      'foreign-ticket',
+      {
+        kind:
+          'PUBLIC_REPLY',
+
+        body:
+          'Attempted cross-tenant reply',
+      },
+    ),
+  ).rejects.toBeInstanceOf(
+    NotFoundException,
+  );
+
+  expect(
+    ticketMessageCreateMock,
+  ).not.toHaveBeenCalled();
+});
+
+it('lists only messages for the ticket inside the tenant', async () => {
+  ticketFindFirstMock
+    .mockResolvedValue({
+      id: 'ticket-1',
+    });
+
+  ticketMessageFindManyMock
+    .mockResolvedValue([
+      {
+        id: 'message-2',
+        body: 'Second',
+      },
+      {
+        id: 'message-1',
+        body: 'First',
+      },
+    ]);
+
+  const result =
+    await service.listMessages(
+      tenant.organizationId,
+      'ticket-1',
+    );
+
+  expect(
+    ticketMessageFindManyMock,
+  ).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: {
+        organizationId:
+          tenant.organizationId,
+
+        ticketId:
+          'ticket-1',
+      },
+
+      take: 100,
+    }),
+  );
+
+  // DB returns newest-first,
+  // API returns chronological order.
+  expect(result).toEqual([
+    {
+      id: 'message-1',
+      body: 'First',
+    },
+    {
+      id: 'message-2',
+      body: 'Second',
+    },
+  ]);
+});
 });

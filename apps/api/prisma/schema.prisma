@@ -36,6 +36,23 @@ enum TicketSource {
   EMAIL
 }
 
+enum TicketMessageKind {
+  PUBLIC_REPLY
+  INTERNAL_NOTE
+}
+
+enum TicketMessageAuthorType {
+  MEMBER
+  CUSTOMER
+  SYSTEM
+}
+
+enum TicketMessageSource {
+  MANUAL
+  EMAIL
+  SYSTEM
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -53,14 +70,15 @@ model User {
 }
 
 model Organization {
-  id          String       @id @default(uuid()) @db.Uuid
+  id          String          @id @default(uuid()) @db.Uuid
   name        String
-  slug        String       @unique
+  slug        String          @unique
   memberships Membership[]
   invitations Invitation[]
   customers   Customer[]
   tickets     Ticket[]
   tags        Tag[]
+  messages    TicketMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -77,7 +95,8 @@ model Membership {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  assignedTickets Ticket[] @relation("TicketAssignee")
+  assignedTickets  Ticket[]        @relation("TicketAssignee")
+  authoredMessages TicketMessage[] @relation("TicketMessageAuthor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -162,6 +181,7 @@ model Ticket {
   closedAt   DateTime?
 
   tagLinks TicketTag[]
+  messages TicketMessage[]
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -212,4 +232,31 @@ model TicketTag {
   @@id([ticketId, tagId])
   @@index([tagId])
   @@map("ticket_tags")
+}
+
+model TicketMessage {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  ticketId       String @db.Uuid
+
+  authorMembershipId String? @db.Uuid
+
+  kind       TicketMessageKind
+  authorType TicketMessageAuthorType
+  source     TicketMessageSource
+
+  body String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorMembership Membership? @relation("TicketMessageAuthor", fields: [authorMembershipId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, ticketId, createdAt])
+  @@index([authorMembershipId])
+  @@map("ticket_messages")
 }

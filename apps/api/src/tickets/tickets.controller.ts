@@ -23,6 +23,7 @@ import { TicketsService } from './tickets.service.js';
 import { UpdateTicketDto } from './dto/update-ticket.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 import { UpdateTicketAssigneeDto } from './dto/update-ticket-assignee.dto.js';
+import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 
 @Controller(
   'v1/organizations/:organizationId/tickets',
@@ -294,6 +295,71 @@ async removeTag(
     tenant,
     ticketId,
     tagId,
+  );
+}
+
+@Get(':ticketId/messages')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_READ,
+)
+async listMessages(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.listMessages(
+    tenant.organizationId,
+    ticketId,
+  );
+}
+
+@Post(':ticketId/messages')
+@RequirePermissions(
+  PERMISSIONS.TICKETS_WRITE,
+)
+async createMessage(
+  @Req()
+  request:
+    TenantAuthenticatedRequest,
+
+  @Param(
+    'ticketId',
+    new ParseUUIDPipe(),
+  )
+  ticketId: string,
+
+  @Body()
+  dto:
+    CreateTicketMessageDto,
+) {
+  const tenant =
+    request.tenant;
+
+  if (!tenant) {
+    throw new ForbiddenException(
+      'Tenant context is required',
+    );
+  }
+
+  return this.ticketsService.createMessage(
+    tenant,
+    ticketId,
+    dto,
   );
 }
 }
