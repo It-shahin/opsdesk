@@ -18,6 +18,7 @@ import { CustomersModule } from './customers/customers.module.js';
 import { TicketsModule } from './tickets/tickets.module.js';
 import { TagsModule } from './tags/tags.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { AttachmentsModule } from './attachments/attachments.module.js';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { StorageModule } from './storage/storage.module.js';
   TicketsModule,
   TagsModule,
   StorageModule,
+  AttachmentsModule,
 ],
   controllers: [AppController],
   providers: [AppService],
