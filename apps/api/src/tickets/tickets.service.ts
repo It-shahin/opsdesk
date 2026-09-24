@@ -1030,6 +1030,21 @@ private messageSelect() {
         },
       },
     },
+
+    attachments: {
+      select: {
+        id: true,
+        originalName: true,
+        contentType: true,
+        sizeBytes: true,
+        status: true,
+        uploadedAt: true,
+      },
+
+      orderBy: {
+        createdAt: 'asc',
+      },
+    },
   } as const;
 }
 
@@ -1042,66 +1057,205 @@ async createMessage(
       | 'INTERNAL_NOTE';
 
     body: string;
+
+    attachmentIds?: string[];
   },
 ) {
-  const ticket =
-    await this.prisma.ticket.findFirst({
-      where: {
-        id: ticketId,
+  const attachmentIds =
+    input.attachmentIds ?? [];
 
-        organizationId:
-          tenant.organizationId,
-      },
-
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-
-  if (!ticket) {
-    throw new NotFoundException(
-      'Ticket not found',
-    );
-  }
+  const uniqueAttachmentIds =
+    [
+      ...new Set(
+        attachmentIds,
+      ),
+    ];
 
   if (
-    input.kind ===
-      'PUBLIC_REPLY' &&
-    ticket.status === 'CLOSED'
+    uniqueAttachmentIds.length !==
+    attachmentIds.length
   ) {
-    throw new ConflictException(
-      'Closed tickets must be reopened before sending a public reply',
+    throw new BadRequestException(
+      'Duplicate attachment IDs are not allowed',
     );
   }
 
-  return this.prisma.ticketMessage.create({
-    data: {
-      organizationId:
-        tenant.organizationId,
+  return this.prisma.$transaction(
+    async (transaction) => {
+      const ticket =
+        await transaction.ticket.findFirst({
+          where: {
+            id: ticketId,
 
-      ticketId:
-        ticket.id,
+            organizationId:
+              tenant.organizationId,
+          },
 
-      authorMembershipId:
-        tenant.membershipId,
+          select: {
+            id: true,
+            status: true,
+          },
+        });
 
-      kind:
-        input.kind,
+      if (!ticket) {
+        throw new NotFoundException(
+          'Ticket not found',
+        );
+      }
 
-      authorType:
-        'MEMBER',
+      if (
+        input.kind ===
+          'PUBLIC_REPLY' &&
+        ticket.status ===
+          'CLOSED'
+      ) {
+        throw new ConflictException(
+          'Closed tickets must be reopened before sending a public reply',
+        );
+      }
 
-      source:
-        'MANUAL',
+      let attachments:
+        Array<{
+          id: string;
+        }> = [];
 
-      body:
-        input.body,
+      if (
+        uniqueAttachmentIds.length >
+        0
+      ) {
+        attachments =
+          await transaction.attachment.findMany({
+            where: {
+              id: {
+                in:
+                  uniqueAttachmentIds,
+              },
+
+              organizationId:
+                tenant.organizationId,
+
+              ticketId:
+                ticket.id,
+
+              status:
+                'UPLOADED',
+
+              messageId:
+                null,
+            },
+
+            select: {
+              id: true,
+            },
+          });
+
+        if (
+          attachments.length !==
+          uniqueAttachmentIds.length
+        ) {
+          throw new ConflictException(
+            'One or more attachments are unavailable',
+          );
+        }
+      }
+
+      const message =
+        await transaction.ticketMessage.create({
+          data: {
+            organizationId:
+              tenant.organizationId,
+
+            ticketId:
+              ticket.id,
+
+            authorMembershipId:
+              tenant.membershipId,
+
+            kind:
+              input.kind,
+
+            authorType:
+              'MEMBER',
+
+            source:
+              'MANUAL',
+
+            body:
+              input.body,
+          },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (
+        uniqueAttachmentIds.length >
+        0
+      ) {
+        const linked =
+          await transaction.attachment.updateMany({
+            where: {
+              id: {
+                in:
+                  uniqueAttachmentIds,
+              },
+
+              organizationId:
+                tenant.organizationId,
+
+              ticketId:
+                ticket.id,
+
+              status:
+                'UPLOADED',
+
+              messageId:
+                null,
+            },
+
+            data: {
+              messageId:
+                message.id,
+            },
+          });
+
+        if (
+          linked.count !==
+          uniqueAttachmentIds.length
+        ) {
+          throw new ConflictException(
+            'One or more attachments were linked concurrently',
+          );
+        }
+      }
+
+      const result =
+        await transaction.ticketMessage.findFirst({
+          where: {
+            id:
+              message.id,
+
+            organizationId:
+              tenant.organizationId,
+
+            ticketId:
+              ticket.id,
+          },
+
+          select:
+            this.messageSelect(),
+        });
+
+      if (!result) {
+        throw new NotFoundException(
+          'Message not found',
+        );
+      }
+
+      return result;
     },
-
-    select:
-      this.messageSelect(),
-  });
+  );
 }
 
 async listMessages(

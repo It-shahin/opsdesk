@@ -5,6 +5,12 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
 
 import type { TicketMessageKind } from '../../generated/prisma/enums.js';
 
@@ -26,4 +32,11 @@ export class CreateTicketMessageDto {
   @MinLength(1)
   @MaxLength(20_000)
   body!: string;
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('4', {
+    each: true,
+  })
+  attachmentIds?: string[];
 }
