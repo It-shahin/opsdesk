@@ -360,4 +360,91 @@ export class AttachmentsService {
 
     return response;
   }
+
+  async createDownloadUrl(
+  tenant: TenantContext,
+  ticketId: string,
+  attachmentId: string,
+) {
+  const attachment =
+    await this.prisma.attachment.findFirst({
+      where: {
+        id:
+          attachmentId,
+
+        organizationId:
+          tenant.organizationId,
+
+        ticketId,
+
+        status:
+          'UPLOADED',
+
+        messageId: {
+          not: null,
+        },
+
+        message: {
+          is: {
+            organizationId:
+              tenant.organizationId,
+
+            ticketId,
+          },
+        },
+      },
+
+      select: {
+        id: true,
+        originalName: true,
+        contentType: true,
+        sizeBytes: true,
+        status: true,
+        uploadedAt: true,
+
+        objectKey: true,
+
+        messageId: true,
+      },
+    });
+
+  if (!attachment) {
+    throw new NotFoundException(
+      'Attachment not found',
+    );
+  }
+
+  const download =
+    await this.storage
+      .createPresignedDownloadUrl(
+        attachment.objectKey,
+      );
+
+  return {
+    attachment: {
+      id:
+        attachment.id,
+
+      originalName:
+        attachment.originalName,
+
+      contentType:
+        attachment.contentType,
+
+      sizeBytes:
+        attachment.sizeBytes,
+
+      status:
+        attachment.status,
+
+      uploadedAt:
+        attachment.uploadedAt,
+
+      messageId:
+        attachment.messageId,
+    },
+
+    download,
+  };
+}
 }

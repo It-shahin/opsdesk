@@ -25,6 +25,8 @@ describe('AttachmentsService', () => {
 
   const createSignedUrlMock = jest.fn();
 
+  const createDownloadUrlMock = jest.fn();
+
   const headObjectMock = jest.fn();
 
   const prisma = {
@@ -45,6 +47,8 @@ describe('AttachmentsService', () => {
     buildAttachmentKey: buildKeyMock,
 
     createPresignedUploadUrl: createSignedUrlMock,
+
+    createPresignedDownloadUrl: createDownloadUrlMock,
 
     headObject: headObjectMock,
   };
@@ -294,5 +298,95 @@ describe('AttachmentsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(attachmentUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a download URL for a linked uploaded attachment', async () => {
+    attachmentFindFirstMock.mockResolvedValue({
+      id: attachmentId,
+
+      originalName: 'hello.txt',
+
+      contentType: 'text/plain',
+
+      sizeBytes: 18,
+
+      status: 'UPLOADED',
+
+      uploadedAt: new Date(),
+
+      objectKey: 'organizations/org/tickets/ticket/attachments/file',
+
+      messageId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    });
+
+    createDownloadUrlMock.mockResolvedValue({
+      url: 'https://r2.example/signed-download',
+
+      expiresInSeconds: 300,
+    });
+
+    const result = await service.createDownloadUrl(
+      tenant,
+      ticketId,
+      attachmentId,
+    );
+
+    expect(attachmentFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: attachmentId,
+
+          organizationId: tenant.organizationId,
+
+          ticketId,
+
+          status: 'UPLOADED',
+
+          messageId: {
+            not: null,
+          },
+
+          message: {
+            is: {
+              organizationId: tenant.organizationId,
+
+              ticketId,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(createDownloadUrlMock).toHaveBeenCalledWith(
+      'organizations/org/tickets/ticket/attachments/file',
+    );
+
+    expect(result.download).toEqual({
+      url: 'https://r2.example/signed-download',
+
+      expiresInSeconds: 300,
+    });
+
+    expect(result.attachment).not.toHaveProperty('objectKey');
+  });
+
+  it('does not expose attachments outside the tenant or ticket', async () => {
+    attachmentFindFirstMock.mockResolvedValue(null);
+
+    await expect(
+      service.createDownloadUrl(tenant, ticketId, attachmentId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(createDownloadUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('does not create conversation download URLs for unlinked attachments', async () => {
+    attachmentFindFirstMock.mockResolvedValue(null);
+
+    await expect(
+      service.createDownloadUrl(tenant, ticketId, attachmentId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(createDownloadUrlMock).not.toHaveBeenCalled();
   });
 });

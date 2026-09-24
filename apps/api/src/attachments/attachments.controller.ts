@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -122,6 +123,44 @@ export class AttachmentsController {
 
     return this.attachmentsService
       .completeUpload(
+        tenant,
+        ticketId,
+        attachmentId,
+      );
+  }
+
+  @Get(':attachmentId/download')
+  @RequirePermissions(
+    PERMISSIONS.TICKETS_READ,
+  )
+  async download(
+    @Req()
+    request:
+      TenantAuthenticatedRequest,
+
+    @Param(
+      'ticketId',
+      new ParseUUIDPipe(),
+    )
+    ticketId: string,
+
+    @Param(
+      'attachmentId',
+      new ParseUUIDPipe(),
+    )
+    attachmentId: string,
+  ) {
+    const tenant =
+      request.tenant;
+
+    if (!tenant) {
+      throw new ForbiddenException(
+        'Tenant context is required',
+      );
+    }
+
+    return this.attachmentsService
+      .createDownloadUrl(
         tenant,
         ticketId,
         attachmentId,

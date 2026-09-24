@@ -10,6 +10,7 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  GetObjectCommand
 } from '@aws-sdk/client-s3';
 
 import {
@@ -242,4 +243,35 @@ export class ObjectStorageService {
 
     return false;
   }
+
+  async createPresignedDownloadUrl(
+  key: string,
+) {
+  const expiresInSeconds =
+    5 * 60;
+
+  const command =
+    new GetObjectCommand({
+      Bucket:
+        this.bucket,
+
+      Key:
+        key,
+    });
+
+  const url =
+    await getSignedUrl(
+      this.client,
+      command,
+      {
+        expiresIn:
+          expiresInSeconds,
+      },
+    );
+
+  return {
+    url,
+    expiresInSeconds,
+  };
+}
 }
