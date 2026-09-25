@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 
 import {
+  MAX_MESSAGE_ATTACHMENTS_BYTES,
+} from '../attachments/attachment-policy.js';
+
+import {
   beforeEach,
   describe,
   expect,
@@ -1158,6 +1162,7 @@ it(
       .mockResolvedValue([
         {
           id: attachmentId,
+          sizeBytes: 18,
         },
       ]);
 
@@ -1212,6 +1217,7 @@ it(
       },
       select: {
         id: true,
+        sizeBytes: true,
       },
     });
 
@@ -1238,6 +1244,57 @@ it(
         id: attachmentId,
       }),
     ]);
+  },
+);
+
+it(
+  'rejects attachments that exceed the maximum total message size',
+  async () => {
+    const attachmentIds = [
+      'attachment-1',
+      'attachment-2',
+      'attachment-3',
+    ];
+
+    const sizeBytes =
+      Math.floor(
+        MAX_MESSAGE_ATTACHMENTS_BYTES /
+          attachmentIds.length,
+      ) + 1;
+
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue(
+        attachmentIds.map(
+          (id) => ({
+            id,
+            sizeBytes,
+          }),
+        ),
+      );
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Too many bytes',
+          attachmentIds,
+        },
+      ),
+    ).rejects.toThrow(
+      'Attachments exceed the maximum total size for a message',
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
   },
 );
 
@@ -1426,6 +1483,7 @@ it(
       .mockResolvedValue([
         {
           id: 'attachment-1',
+          sizeBytes: 18,
         },
       ]);
 

@@ -19,7 +19,11 @@ describe('AttachmentsService', () => {
 
   const attachmentFindFirstMock = jest.fn();
 
+  const attachmentFindManyMock = jest.fn();
+
   const attachmentUpdateManyMock = jest.fn();
+
+  const attachmentDeleteManyMock = jest.fn();
 
   const buildKeyMock = jest.fn();
 
@@ -28,6 +32,8 @@ describe('AttachmentsService', () => {
   const createDownloadUrlMock = jest.fn();
 
   const headObjectMock = jest.fn();
+
+  const deleteObjectMock = jest.fn();
 
   const prisma = {
     ticket: {
@@ -39,7 +45,11 @@ describe('AttachmentsService', () => {
 
       findFirst: attachmentFindFirstMock,
 
+      findMany: attachmentFindManyMock,
+
       updateMany: attachmentUpdateManyMock,
+
+      deleteMany: attachmentDeleteManyMock,
     },
   };
 
@@ -51,6 +61,8 @@ describe('AttachmentsService', () => {
     createPresignedDownloadUrl: createDownloadUrlMock,
 
     headObject: headObjectMock,
+
+    deleteObject: deleteObjectMock,
   };
 
   const tenant: TenantContext = {
@@ -246,7 +258,7 @@ describe('AttachmentsService', () => {
     expect(result.status).toBe('UPLOADED');
   });
 
-  it('rejects a completed object with the wrong size', async () => {
+  it('removes an invalid uploaded object', async () => {
     attachmentFindFirstMock.mockResolvedValue({
       id: attachmentId,
 
@@ -271,9 +283,19 @@ describe('AttachmentsService', () => {
       },
     });
 
+    deleteObjectMock.mockResolvedValue(undefined);
+
+    attachmentDeleteManyMock.mockResolvedValue({
+      count: 1,
+    });
+
     await expect(
       service.completeUpload(tenant, ticketId, attachmentId),
     ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(deleteObjectMock).toHaveBeenCalledWith('object-key');
+
+    expect(attachmentDeleteManyMock).toHaveBeenCalled();
 
     expect(attachmentUpdateManyMock).not.toHaveBeenCalled();
   });
@@ -357,9 +379,11 @@ describe('AttachmentsService', () => {
       }),
     );
 
-    expect(createDownloadUrlMock).toHaveBeenCalledWith(
-      'organizations/org/tickets/ticket/attachments/file',
-    );
+    expect(createDownloadUrlMock).toHaveBeenCalledWith({
+      key: 'organizations/org/tickets/ticket/attachments/file',
+      filename: 'hello.txt',
+      contentType: 'text/plain',
+    });
 
     expect(result.download).toEqual({
       url: 'https://r2.example/signed-download',
@@ -388,5 +412,58 @@ describe('AttachmentsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(createDownloadUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('removes abandoned uploads from storage and database', async () => {
+    attachmentFindManyMock.mockResolvedValue([
+      {
+        id: attachmentId,
+        objectKey: 'old-object-key',
+      },
+    ]);
+
+    deleteObjectMock.mockResolvedValue(undefined);
+
+    attachmentDeleteManyMock.mockResolvedValue({
+      count: 1,
+    });
+
+    const result = await service.cleanupAbandonedUploads();
+
+    expect(deleteObjectMock).toHaveBeenCalledWith('old-object-key');
+
+    expect(attachmentDeleteManyMock).toHaveBeenCalledWith({
+      where: {
+        id: attachmentId,
+        messageId: null,
+      },
+    });
+
+    expect(result).toEqual({
+      scanned: 1,
+      deleted: 1,
+      failed: 0,
+    });
+  });
+
+  it('keeps metadata when storage cleanup fails', async () => {
+    attachmentFindManyMock.mockResolvedValue([
+      {
+        id: attachmentId,
+        objectKey: 'object-key',
+      },
+    ]);
+
+    deleteObjectMock.mockRejectedValue(new Error('R2 unavailable'));
+
+    const result = await service.cleanupAbandonedUploads();
+
+    expect(attachmentDeleteManyMock).not.toHaveBeenCalled();
+
+    expect(result).toEqual({
+      scanned: 1,
+      deleted: 0,
+      failed: 1,
+    });
   });
 });

@@ -17,6 +17,10 @@ import type {
 } from './dto/list-tickets.dto.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 
+import {
+  MAX_MESSAGE_ATTACHMENTS_BYTES,
+} from '../attachments/attachment-policy.js';
+
 export type CreateTicketInput = {
   customerId: string;
   subject: string;
@@ -1117,6 +1121,7 @@ async createMessage(
       let attachments:
         Array<{
           id: string;
+          sizeBytes: number;
         }> = [];
 
       if (
@@ -1146,6 +1151,7 @@ async createMessage(
 
             select: {
               id: true,
+              sizeBytes: true,
             },
           });
 
@@ -1155,6 +1161,26 @@ async createMessage(
         ) {
           throw new ConflictException(
             'One or more attachments are unavailable',
+          );
+        }
+
+        const totalAttachmentBytes =
+          attachments.reduce(
+            (
+              total,
+              attachment,
+            ) =>
+              total +
+              attachment.sizeBytes,
+            0,
+          );
+
+        if (
+          totalAttachmentBytes >
+          MAX_MESSAGE_ATTACHMENTS_BYTES
+        ) {
+          throw new BadRequestException(
+            'Attachments exceed the maximum total size for a message',
           );
         }
       }

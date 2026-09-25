@@ -1,8 +1,18 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
+import {
+  filenameMatchesContentType,
+  isAllowedContentType,
+  normalizeContentType,
+  sanitizeFilename,
+  PENDING_UPLOAD_MAX_AGE_MS,
+  UNLINKED_UPLOAD_MAX_AGE_MS,
+} from './attachment-policy.js';
 
 import {
   randomUUID,
@@ -42,6 +52,36 @@ export class AttachmentsService {
     input:
       InitiateAttachmentInput,
   ) {
+    const contentType =
+      normalizeContentType(
+        input.contentType,
+      );
+
+    if (
+      !isAllowedContentType(
+        contentType,
+      )
+    ) {
+      throw new BadRequestException(
+        'Attachment type is not allowed',
+      );
+    }
+
+    const safeFilename =
+      sanitizeFilename(
+        input.originalName,
+      );
+
+    if (
+      !filenameMatchesContentType(
+        safeFilename,
+        contentType,
+      )
+    ) {
+      throw new BadRequestException(
+        'Filename extension does not match attachment type',
+      );
+    }
     const ticket =
       await this.prisma.ticket.findFirst({
         where: {
@@ -103,7 +143,7 @@ export class AttachmentsService {
           objectKey,
 
           originalName:
-            input.originalName,
+            safeFilename,
 
           contentType:
             input.contentType,
@@ -127,8 +167,7 @@ export class AttachmentsService {
 
           attachmentId,
 
-          contentType:
-            input.contentType,
+          contentType,
         });
 
     return {
@@ -201,21 +240,23 @@ export class AttachmentsService {
       object.contentLength !==
       attachment.sizeBytes
     ) {
-      throw new ConflictException(
+      return this.rejectInvalidUpload(
+        attachment,
         'Uploaded file size does not match attachment metadata',
       );
     }
 
     if (
       !object.contentType ||
-      this.normalizeContentType(
+      normalizeContentType(
         object.contentType,
       ) !==
-        this.normalizeContentType(
+        normalizeContentType(
           attachment.contentType,
         )
     ) {
-      throw new ConflictException(
+      return this.rejectInvalidUpload(
+        attachment,
         'Uploaded file type does not match attachment metadata',
       );
     }
@@ -229,7 +270,8 @@ export class AttachmentsService {
       storedAttachmentId !==
       attachment.id
     ) {
-      throw new ConflictException(
+      return this.rejectInvalidUpload(
+        attachment,
         'Uploaded object metadata is invalid',
       );
     }
@@ -336,15 +378,6 @@ export class AttachmentsService {
     } as const;
   }
 
-  private normalizeContentType(
-    contentType: string,
-  ) {
-    return contentType
-      .split(';', 1)[0]
-      .trim()
-      .toLowerCase();
-  }
-
   private toResponse<
     T extends {
       objectKey?: string;
@@ -415,10 +448,17 @@ export class AttachmentsService {
   }
 
   const download =
-    await this.storage
-      .createPresignedDownloadUrl(
+  await this.storage
+    .createPresignedDownloadUrl({
+      key:
         attachment.objectKey,
-      );
+
+      filename:
+        attachment.originalName,
+
+      contentType:
+        attachment.contentType,
+    });
 
   return {
     attachment: {
@@ -445,6 +485,138 @@ export class AttachmentsService {
     },
 
     download,
+  };
+}
+
+private async rejectInvalidUpload(
+  attachment: {
+    id: string;
+    objectKey: string;
+  },
+  message: string,
+): Promise<never> {
+  try {
+    await this.storage.deleteObject(
+      attachment.objectKey,
+    );
+
+    await this.prisma.attachment.deleteMany({
+      where: {
+        id:
+          attachment.id,
+
+        status:
+          'PENDING',
+      },
+    });
+  } catch {
+    /*
+     * Leave the DB record/object for
+     * the abandoned-upload cleanup pass.
+     */
+  }
+
+  throw new ConflictException(
+    message,
+  );
+}
+
+async cleanupAbandonedUploads() {
+  const now =
+    Date.now();
+
+  const pendingBefore =
+    new Date(
+      now -
+        PENDING_UPLOAD_MAX_AGE_MS,
+    );
+
+  const unlinkedBefore =
+    new Date(
+      now -
+        UNLINKED_UPLOAD_MAX_AGE_MS,
+    );
+
+  const candidates =
+    await this.prisma.attachment.findMany({
+      where: {
+        OR: [
+          {
+            status:
+              'PENDING',
+
+            createdAt: {
+              lt:
+                pendingBefore,
+            },
+          },
+
+          {
+            status:
+              'UPLOADED',
+
+            messageId:
+              null,
+
+            createdAt: {
+              lt:
+                unlinkedBefore,
+            },
+          },
+        ],
+      },
+
+      select: {
+        id: true,
+        objectKey: true,
+      },
+
+      orderBy: {
+        createdAt:
+          'asc',
+      },
+
+      take:
+        100,
+    });
+
+  let deleted =
+    0;
+
+  let failed =
+    0;
+
+  for (
+    const attachment
+    of candidates
+  ) {
+    try {
+      await this.storage.deleteObject(
+        attachment.objectKey,
+      );
+
+      await this.prisma.attachment.deleteMany({
+        where: {
+          id:
+            attachment.id,
+
+          messageId:
+            null,
+        },
+      });
+
+      deleted += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return {
+    scanned:
+      candidates.length,
+
+    deleted,
+    failed,
   };
 }
 }

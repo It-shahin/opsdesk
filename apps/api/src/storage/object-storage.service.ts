@@ -10,7 +10,8 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
-  GetObjectCommand
+  GetObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 
 import {
@@ -244,11 +245,34 @@ export class ObjectStorageService {
     return false;
   }
 
-  async createPresignedDownloadUrl(
-  key: string,
+async createPresignedDownloadUrl(
+  input: {
+    key: string;
+    filename: string;
+    contentType: string;
+  },
 ) {
   const expiresInSeconds =
     5 * 60;
+
+  const safeAsciiFilename =
+    input.filename
+      .replace(
+        /[^\x20-\x7E]/g,
+        '_',
+      )
+      .replace(
+        /["\\]/g,
+        '_',
+      );
+
+  const encodedFilename =
+    encodeURIComponent(
+      input.filename,
+    );
+
+  const contentDisposition =
+    `attachment; filename="${safeAsciiFilename}"; filename*=UTF-8''${encodedFilename}`;
 
   const command =
     new GetObjectCommand({
@@ -256,7 +280,13 @@ export class ObjectStorageService {
         this.bucket,
 
       Key:
-        key,
+        input.key,
+
+      ResponseContentType:
+        input.contentType,
+
+      ResponseContentDisposition:
+        contentDisposition,
     });
 
   const url =
@@ -273,5 +303,19 @@ export class ObjectStorageService {
     url,
     expiresInSeconds,
   };
+}
+
+async deleteObject(
+  key: string,
+): Promise<void> {
+  await this.client.send(
+    new DeleteObjectCommand({
+      Bucket:
+        this.bucket,
+
+      Key:
+        key,
+    }),
+  );
 }
 }

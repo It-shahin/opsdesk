@@ -3,6 +3,7 @@ import {
 } from 'class-transformer';
 
 import {
+  IsIn,
   IsInt,
   IsString,
   Max,
@@ -11,8 +12,10 @@ import {
   MinLength,
 } from 'class-validator';
 
-const MAX_ATTACHMENT_SIZE =
-  25 * 1024 * 1024;
+import {
+  ALLOWED_ATTACHMENT_CONTENT_TYPES,
+  MAX_ATTACHMENT_SIZE_BYTES,
+} from '../attachment-policy.js';
 
 export class InitiateAttachmentUploadDto {
   @Transform(({ value }) =>
@@ -32,13 +35,15 @@ export class InitiateAttachmentUploadDto {
           .toLowerCase()
       : value,
   )
-  @IsString()
-  @MinLength(1)
-  @MaxLength(127)
+  @IsIn([
+    ...ALLOWED_ATTACHMENT_CONTENT_TYPES,
+  ])
   contentType!: string;
 
   @IsInt()
   @Min(1)
-  @Max(MAX_ATTACHMENT_SIZE)
+  @Max(
+    MAX_ATTACHMENT_SIZE_BYTES,
+  )
   sizeBytes!: number;
 }

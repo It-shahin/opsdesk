@@ -13,6 +13,9 @@ import {
 } from 'class-validator';
 
 import type { TicketMessageKind } from '../../generated/prisma/enums.js';
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+} from '../../attachments/attachment-policy.js';
 
 const MESSAGE_KINDS = [
   'PUBLIC_REPLY',
@@ -34,7 +37,9 @@ export class CreateTicketMessageDto {
   body!: string;
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(
+    MAX_ATTACHMENTS_PER_MESSAGE,
+  )
   @IsUUID('4', {
     each: true,
   })
