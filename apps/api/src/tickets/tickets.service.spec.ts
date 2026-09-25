@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 
 import {
+  MAX_MESSAGE_ATTACHMENTS_BYTES,
+} from '../attachments/attachment-policy.js';
+
+import {
   beforeEach,
   describe,
   expect,
@@ -40,6 +44,18 @@ describe('TicketsService', () => {
   const transactionTicketUpdateManyMock =
     jest.fn();
 
+  const txAttachmentFindManyMock =
+    jest.fn();
+
+  const txAttachmentUpdateManyMock =
+    jest.fn();
+
+  const txTicketMessageCreateMock =
+    jest.fn();
+
+  const txTicketMessageFindFirstMock =
+    jest.fn();
+
   const membershipFindFirstMock =
     jest.fn();
 
@@ -51,9 +67,6 @@ describe('TicketsService', () => {
 
   const ticketTagDeleteManyMock =
     jest.fn();
-
-    const ticketMessageCreateMock =
-      jest.fn();
 
     const ticketMessageFindManyMock =
       jest.fn();
@@ -68,6 +81,22 @@ describe('TicketsService', () => {
 
       updateMany:
         transactionTicketUpdateManyMock,
+    },
+
+    attachment: {
+      findMany:
+        txAttachmentFindManyMock,
+
+      updateMany:
+        txAttachmentUpdateManyMock,
+    },
+
+    ticketMessage: {
+      create:
+        txTicketMessageCreateMock,
+
+      findFirst:
+        txTicketMessageFindFirstMock,
     },
   };
 
@@ -137,7 +166,7 @@ describe('TicketsService', () => {
 
     ticketMessage: {
       create:
-        ticketMessageCreateMock,
+        txTicketMessageCreateMock,
 
       findMany:
         ticketMessageFindManyMock,
@@ -177,6 +206,13 @@ describe('TicketsService', () => {
         );
       },
     );
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        authorType: 'MEMBER',
+        attachments: [],
+      });
 
     service =
       new TicketsService(
@@ -908,13 +944,13 @@ describe('TicketsService', () => {
   });
 
   it('creates a public member reply', async () => {
-  ticketFindFirstMock
+  transactionTicketFindFirstMock
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'OPEN',
     });
 
-  ticketMessageCreateMock
+  txTicketMessageCreateMock
     .mockResolvedValue({
       id: 'message-1',
 
@@ -945,7 +981,7 @@ describe('TicketsService', () => {
     );
 
   expect(
-    ticketMessageCreateMock,
+    txTicketMessageCreateMock,
   ).toHaveBeenCalledWith(
     expect.objectContaining({
       data: {
@@ -979,13 +1015,13 @@ describe('TicketsService', () => {
 });
 
 it('creates an internal note', async () => {
-  ticketFindFirstMock
+  transactionTicketFindFirstMock
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'OPEN',
     });
 
-  ticketMessageCreateMock
+  txTicketMessageCreateMock
     .mockResolvedValue({
       id: 'message-1',
       kind:
@@ -1011,7 +1047,7 @@ it('creates an internal note', async () => {
   );
 
   expect(
-    ticketMessageCreateMock,
+    txTicketMessageCreateMock,
   ).toHaveBeenCalledWith(
     expect.objectContaining({
       data:
@@ -1027,7 +1063,7 @@ it('creates an internal note', async () => {
 });
 
 it('rejects public replies on closed tickets', async () => {
-  ticketFindFirstMock
+  transactionTicketFindFirstMock
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'CLOSED',
@@ -1050,18 +1086,18 @@ it('rejects public replies on closed tickets', async () => {
   );
 
   expect(
-    ticketMessageCreateMock,
+    txTicketMessageCreateMock,
   ).not.toHaveBeenCalled();
 });
 
 it('allows internal notes on closed tickets', async () => {
-  ticketFindFirstMock
+  transactionTicketFindFirstMock
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'CLOSED',
     });
 
-  ticketMessageCreateMock
+  txTicketMessageCreateMock
     .mockResolvedValue({
       id: 'message-1',
       kind:
@@ -1081,12 +1117,12 @@ it('allows internal notes on closed tickets', async () => {
   );
 
   expect(
-    ticketMessageCreateMock,
+    txTicketMessageCreateMock,
   ).toHaveBeenCalled();
 });
 
 it('does not create messages on tickets outside the tenant', async () => {
-  ticketFindFirstMock
+  transactionTicketFindFirstMock
     .mockResolvedValue(null);
 
   await expect(
@@ -1106,9 +1142,411 @@ it('does not create messages on tickets outside the tenant', async () => {
   );
 
   expect(
-    ticketMessageCreateMock,
+    txTicketMessageCreateMock,
   ).not.toHaveBeenCalled();
 });
+
+it(
+  'creates a message and links an uploaded attachment',
+  async () => {
+    const attachmentId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([
+        {
+          id: attachmentId,
+          sizeBytes: 18,
+        },
+      ]);
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txAttachmentUpdateManyMock
+      .mockResolvedValue({
+        count: 1,
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'PUBLIC_REPLY',
+        body: 'See attached.',
+        attachments: [
+          {
+            id: attachmentId,
+            originalName: 'hello.txt',
+          },
+        ],
+      });
+
+    const result =
+      await service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'See attached.',
+          attachmentIds: [
+            attachmentId,
+          ],
+        },
+      );
+
+    expect(
+      txAttachmentFindManyMock,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: [attachmentId],
+        },
+        organizationId:
+          tenant.organizationId,
+        ticketId: 'ticket-1',
+        status: 'UPLOADED',
+        messageId: null,
+      },
+      select: {
+        id: true,
+        sizeBytes: true,
+      },
+    });
+
+    expect(
+      txAttachmentUpdateManyMock,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: [attachmentId],
+        },
+        organizationId:
+          tenant.organizationId,
+        ticketId: 'ticket-1',
+        status: 'UPLOADED',
+        messageId: null,
+      },
+      data: {
+        messageId: 'message-1',
+      },
+    });
+
+    expect(result.attachments).toEqual([
+      expect.objectContaining({
+        id: attachmentId,
+      }),
+    ]);
+  },
+);
+
+it(
+  'rejects attachments that exceed the maximum total message size',
+  async () => {
+    const attachmentIds = [
+      'attachment-1',
+      'attachment-2',
+      'attachment-3',
+    ];
+
+    const sizeBytes =
+      Math.floor(
+        MAX_MESSAGE_ATTACHMENTS_BYTES /
+          attachmentIds.length,
+      ) + 1;
+
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue(
+        attachmentIds.map(
+          (id) => ({
+            id,
+            sizeBytes,
+          }),
+        ),
+      );
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Too many bytes',
+          attachmentIds,
+        },
+      ),
+    ).rejects.toThrow(
+      'Attachments exceed the maximum total size for a message',
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects pending attachments',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([]);
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Attachment not finished.',
+          attachmentIds: [
+            'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects an attachment from another ticket',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([]);
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Wrong ticket attachment.',
+          attachmentIds: [
+            'attachment-from-ticket-2',
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      txAttachmentFindManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where:
+          expect.objectContaining({
+            organizationId:
+              tenant.organizationId,
+            ticketId: 'ticket-1',
+          }),
+      }),
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects an attachment from another tenant',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([]);
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Wrong tenant attachment.',
+          attachmentIds: [
+            'attachment-from-org-2',
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      txAttachmentFindManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where:
+          expect.objectContaining({
+            organizationId:
+              tenant.organizationId,
+          }),
+      }),
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects an attachment that is already linked',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([]);
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Already linked attachment.',
+          attachmentIds: [
+            'already-linked-attachment',
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      txAttachmentFindManyMock,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where:
+          expect.objectContaining({
+            messageId: null,
+          }),
+      }),
+    );
+
+    expect(
+      txTicketMessageCreateMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects an attachment linked concurrently',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txAttachmentFindManyMock
+      .mockResolvedValue([
+        {
+          id: 'attachment-1',
+          sizeBytes: 18,
+        },
+      ]);
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txAttachmentUpdateManyMock
+      .mockResolvedValue({
+        count: 0,
+      });
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Race test',
+          attachmentIds: [
+            'attachment-1',
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(
+      txTicketMessageFindFirstMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'rejects duplicate attachment IDs',
+  async () => {
+    const attachmentId =
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Duplicate',
+          attachmentIds: [
+            attachmentId,
+            attachmentId,
+          ],
+        },
+      ),
+    ).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(
+      transactionMock,
+    ).not.toHaveBeenCalled();
+  },
+);
 
 it('lists only messages for the ticket inside the tenant', async () => {
   ticketFindFirstMock

@@ -53,6 +53,11 @@ enum TicketMessageSource {
   SYSTEM
 }
 
+enum AttachmentStatus {
+  PENDING
+  UPLOADED
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -79,6 +84,7 @@ model Organization {
   tickets     Ticket[]
   tags        Tag[]
   messages    TicketMessage[]
+  attachments Attachment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -95,8 +101,9 @@ model Membership {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  assignedTickets  Ticket[]        @relation("TicketAssignee")
-  authoredMessages TicketMessage[] @relation("TicketMessageAuthor")
+  assignedTickets    Ticket[]        @relation("TicketAssignee")
+  authoredMessages   TicketMessage[] @relation("TicketMessageAuthor")
+  createdAttachments Attachment[]    @relation("AttachmentCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -180,8 +187,9 @@ model Ticket {
   resolvedAt DateTime?
   closedAt   DateTime?
 
-  tagLinks TicketTag[]
-  messages TicketMessage[]
+  tagLinks    TicketTag[]
+  messages    TicketMessage[]
+  attachments Attachment[]
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -247,6 +255,8 @@ model TicketMessage {
 
   body String
 
+  attachments Attachment[]
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -259,4 +269,41 @@ model TicketMessage {
   @@index([organizationId, ticketId, createdAt])
   @@index([authorMembershipId])
   @@map("ticket_messages")
+}
+
+model Attachment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  ticketId       String @db.Uuid
+
+  messageId String? @db.Uuid
+
+  createdByMembershipId String? @db.Uuid
+
+  objectKey    String @unique
+  originalName String
+  contentType  String
+  sizeBytes    Int
+
+  status AttachmentStatus @default(PENDING)
+
+  etag       String?
+  uploadedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  message TicketMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  createdByMembership Membership? @relation("AttachmentCreator", fields: [createdByMembershipId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, ticketId])
+  @@index([messageId])
+  @@index([createdByMembershipId])
+  @@index([organizationId, status, createdAt])
+  @@map("attachments")
 }

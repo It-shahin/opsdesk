@@ -149,7 +149,9 @@ describe('Tickets HTTP security', () => {
     jest.fn();
   const ticketTagDeleteManyMock =
     jest.fn();
-  const ticketMessageCreateMock =
+  const txTicketMessageCreateMock =
+    jest.fn();
+  const txTicketMessageFindFirstMock =
     jest.fn();
   const ticketMessageFindManyMock =
     jest.fn();
@@ -164,6 +166,12 @@ describe('Tickets HTTP security', () => {
         txTicketFindFirstMock,
       updateMany:
         txTicketUpdateManyMock,
+    },
+    ticketMessage: {
+      create:
+        txTicketMessageCreateMock,
+      findFirst:
+        txTicketMessageFindFirstMock,
     },
   };
 
@@ -294,7 +302,7 @@ describe('Tickets HTTP security', () => {
       },
       ticketMessage: {
         create:
-          ticketMessageCreateMock,
+          txTicketMessageCreateMock,
         findMany:
           ticketMessageFindManyMock,
       },
@@ -374,6 +382,13 @@ describe('Tickets HTTP security', () => {
         );
       },
     );
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        authorType: 'MEMBER',
+        attachments: [],
+      });
   });
 
   afterAll(async () => {
@@ -487,7 +502,7 @@ describe('Tickets HTTP security', () => {
       .expect(403);
 
     expect(
-      ticketMessageCreateMock,
+      txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
   });
 
@@ -831,12 +846,12 @@ describe('Tickets HTTP security', () => {
   });
 
   it('creates a member-authored public reply using trusted tenant identity', async () => {
-    ticketFindFirstMock
+    txTicketFindFirstMock
       .mockResolvedValue({
         id: TICKET_A,
         status: 'OPEN',
       });
-    ticketMessageCreateMock
+    txTicketMessageCreateMock
       .mockResolvedValue({
         id: 'message-1',
         kind: 'PUBLIC_REPLY',
@@ -862,7 +877,7 @@ describe('Tickets HTTP security', () => {
       .expect(201);
 
     expect(
-      ticketMessageCreateMock,
+      txTicketMessageCreateMock,
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
@@ -898,12 +913,12 @@ describe('Tickets HTTP security', () => {
       .expect(400);
 
     expect(
-      ticketMessageCreateMock,
+      txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
   });
 
   it('rejects public replies on closed tickets', async () => {
-    ticketFindFirstMock
+    txTicketFindFirstMock
       .mockResolvedValue({
         id: TICKET_A,
         status: 'CLOSED',
@@ -924,17 +939,17 @@ describe('Tickets HTTP security', () => {
       .expect(409);
 
     expect(
-      ticketMessageCreateMock,
+      txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
   });
 
   it('allows internal notes on closed tickets', async () => {
-    ticketFindFirstMock
+    txTicketFindFirstMock
       .mockResolvedValue({
         id: TICKET_A,
         status: 'CLOSED',
       });
-    ticketMessageCreateMock
+    txTicketMessageCreateMock
       .mockResolvedValue({
         id: 'message-1',
         kind: 'INTERNAL_NOTE',
