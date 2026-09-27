@@ -4,7 +4,17 @@ import { ConfigModule } from '@nestjs/config';
 
 import { validateEnv } from './config/env.validation.js';
 
-import { EmailWorker } from './jobs/email.worker.js';
+import {
+  DatabaseModule,
+} from './database/database.module.js';
+
+import {
+  EmailModule,
+} from './email/email.module.js';
+
+import {
+  EmailWorker,
+} from './jobs/email.worker.js';
 
 @Module({
   imports: [
@@ -15,6 +25,9 @@ import { EmailWorker } from './jobs/email.worker.js';
 
       validate: validateEnv,
     }),
+    DatabaseModule,
+
+    EmailModule,
   ],
 
   providers: [EmailWorker],

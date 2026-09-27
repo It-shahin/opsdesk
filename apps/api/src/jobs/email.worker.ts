@@ -11,6 +11,7 @@ import {
 
 import {
   Job,
+  UnrecoverableError,
   Worker,
 } from 'bullmq';
 
@@ -27,6 +28,18 @@ import type {
   EmailSmokeTestJob,
   SendTicketReplyJob,
 } from './jobs.types.js';
+
+import {
+  PrismaService,
+} from '../database/prisma.service.js';
+
+import {
+  EmailService,
+} from '../email/email.service.js';
+
+import {
+  buildTicketReplyEmail,
+} from '../email/ticket-reply-email.js';
 
 @Injectable()
 export class EmailWorker
@@ -46,16 +59,22 @@ export class EmailWorker
       null;
 
   constructor(
-    config:
-      ConfigService,
-  ) {
-    this.connection =
-      createWorkerRedisConnection(
-        config.getOrThrow<string>(
-          'REDIS_URL',
-        ),
-      );
-  }
+  config:
+    ConfigService,
+
+  private readonly prisma:
+    PrismaService,
+
+  private readonly emailService:
+    EmailService,
+) {
+  this.connection =
+    createWorkerRedisConnection(
+      config.getOrThrow<string>(
+        'REDIS_URL',
+      ),
+    );
+}
 
   onModuleInit() {
     this.worker =
@@ -147,16 +166,116 @@ export class EmailWorker
   }
 
   private async processTicketReply(
-    _job:
-      Job<SendTicketReplyJob>,
+  job:
+    Job<SendTicketReplyJob>,
+) {
+  const {
+    messageId,
+    organizationId,
+    ticketId,
+  } =
+    job.data;
+
+  const message =
+    await this.prisma
+      .ticketMessage
+      .findFirst({
+        where: {
+          id:
+            messageId,
+
+          organizationId,
+
+          ticketId,
+
+          kind:
+            'PUBLIC_REPLY',
+
+          authorType:
+            'MEMBER',
+        },
+
+        select: {
+          id:
+            true,
+
+          body:
+            true,
+
+          ticket: {
+            select: {
+              subject:
+                true,
+
+              customer: {
+                select: {
+                  name:
+                    true,
+
+                  email:
+                    true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+  if (
+    !message
   ) {
-    /*
-     * Implemented in 7B/7C.
-     */
-    throw new Error(
-      'Ticket email delivery is not implemented yet',
+    throw new UnrecoverableError(
+      'Ticket reply message was not found',
     );
   }
+
+  const customerEmail =
+    message.ticket
+      .customer
+      .email
+      ?.trim();
+
+  if (
+    !customerEmail
+  ) {
+    throw new UnrecoverableError(
+      'Ticket customer has no email address',
+    );
+  }
+
+  const email =
+    buildTicketReplyEmail({
+      customerName:
+        message.ticket
+          .customer
+          .name,
+
+      ticketSubject:
+        message.ticket
+          .subject,
+
+      body:
+        message.body,
+    });
+
+  const result =
+    await this.emailService
+      .sendTicketReply({
+        messageId:
+          message.id,
+
+        to:
+          customerEmail,
+
+        ...email,
+      });
+
+  this.logger.log(
+    `Sent ticket reply for message ${message.id}; provider message ${result.providerMessageId}`,
+  );
+
+  return result;
+}
 
   async onModuleDestroy() {
     if (
