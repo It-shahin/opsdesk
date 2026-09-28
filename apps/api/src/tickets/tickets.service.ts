@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -15,6 +16,11 @@ import type {
   TicketSortBy,
   TicketSortOrder,
 } from './dto/list-tickets.dto.js';
+
+import {
+  JobsService,
+} from '../jobs/jobs.service.js';
+
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 
 import {
@@ -36,9 +42,17 @@ export type UpdateTicketInput = {
 
 @Injectable()
 export class TicketsService {
+  private readonly logger =
+    new Logger(
+      TicketsService.name,
+    );
+
   constructor(
     private readonly prisma:
       PrismaService,
+
+    private readonly jobsService:
+      JobsService,
   ) {}
 
   async create(
@@ -1084,7 +1098,8 @@ async createMessage(
     );
   }
 
-  return this.prisma.$transaction(
+  const message =
+    await this.prisma.$transaction(
     async (transaction) => {
       const ticket =
         await transaction.ticket.findFirst({
@@ -1282,6 +1297,33 @@ async createMessage(
       return result;
     },
   );
+
+  if (
+    input.kind ===
+    'PUBLIC_REPLY'
+  ) {
+    try {
+      await this.jobsService
+        .enqueueTicketReply({
+          messageId:
+            message.id,
+
+          organizationId:
+            tenant.organizationId,
+
+          ticketId,
+        });
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue outbound email for message ${message.id}`,
+        error instanceof Error
+          ? error.stack
+          : undefined,
+      );
+    }
+  }
+
+  return message;
 }
 
 async listMessages(

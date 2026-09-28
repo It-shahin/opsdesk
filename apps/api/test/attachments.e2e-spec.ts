@@ -22,6 +22,7 @@ import request from 'supertest';
 import { AttachmentsController } from '../src/attachments/attachments.controller.js';
 import { AttachmentsService } from '../src/attachments/attachments.service.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { JobsService } from '../src/jobs/jobs.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { ObjectStorageService } from '../src/storage/object-storage.service.js';
@@ -102,6 +103,7 @@ describe('Attachment HTTP security', () => {
   const txAttachmentUpdateManyMock = jest.fn();
   const txMessageCreateMock = jest.fn();
   const txMessageFindFirstMock = jest.fn();
+  const enqueueTicketReplyMock = jest.fn();
 
   const transactionClient = {
     ticket: {
@@ -206,6 +208,12 @@ describe('Attachment HTTP security', () => {
         AttachmentsService,
         TicketsService,
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: JobsService,
+          useValue: {
+            enqueueTicketReply: enqueueTicketReplyMock,
+          },
+        },
         { provide: ObjectStorageService, useValue: storage },
         {
           provide: TenantContextService,
@@ -236,6 +244,7 @@ describe('Attachment HTTP security', () => {
     transactionMock.mockImplementation(async (callback) =>
       callback(transactionClient),
     );
+    enqueueTicketReplyMock.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -526,6 +535,40 @@ describe('Attachment HTTP security', () => {
       },
       data: { messageId: MESSAGE_A },
     });
+    expect(enqueueTicketReplyMock).toHaveBeenCalledWith({
+      messageId: MESSAGE_A,
+      organizationId: ORG_A,
+      ticketId: TICKET_A,
+    });
+  });
+
+  it('never queues email for internal notes', async () => {
+    txTicketFindFirstMock.mockResolvedValue({
+      id: TICKET_A,
+      status: 'OPEN',
+    });
+    txMessageCreateMock.mockResolvedValue({
+      id: MESSAGE_A,
+    });
+    txMessageFindFirstMock.mockResolvedValue({
+      id: MESSAGE_A,
+      kind: 'INTERNAL_NOTE',
+      authorType: 'MEMBER',
+      source: 'MANUAL',
+      body: 'Internal discussion.',
+      attachments: [],
+    });
+
+    await request(app.getHttpServer())
+      .post(messagesUrl)
+      .set('Authorization', 'Bearer agent-token')
+      .send({
+        kind: 'INTERNAL_NOTE',
+        body: 'Internal discussion.',
+      })
+      .expect(201);
+
+    expect(enqueueTicketReplyMock).not.toHaveBeenCalled();
   });
 
   it('rejects an unavailable or already-linked attachment', async () => {

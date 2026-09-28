@@ -17,6 +17,9 @@ import {
 } from '@jest/globals';
 
 import { PrismaService } from '../database/prisma.service.js';
+import {
+  JobsService,
+} from '../jobs/jobs.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 import { TicketsService } from './tickets.service.js';
 
@@ -54,6 +57,9 @@ describe('TicketsService', () => {
     jest.fn();
 
   const txTicketMessageFindFirstMock =
+    jest.fn();
+
+  const enqueueTicketReplyMock =
     jest.fn();
 
   const membershipFindFirstMock =
@@ -214,9 +220,18 @@ describe('TicketsService', () => {
         attachments: [],
       });
 
+    enqueueTicketReplyMock
+      .mockResolvedValue(
+        undefined,
+      );
+
     service =
       new TicketsService(
         prisma as unknown as PrismaService,
+        {
+          enqueueTicketReply:
+            enqueueTicketReplyMock,
+        } as unknown as JobsService,
       );
   });
 
@@ -1061,6 +1076,156 @@ it('creates an internal note', async () => {
     }),
   );
 });
+
+it(
+  'queues outbound email after creating a public reply',
+  async () => {
+    const ticketId =
+      'ticket-1';
+
+    const messageId =
+      'message-1';
+
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: ticketId,
+        status: 'OPEN',
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: messageId,
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: messageId,
+        kind: 'PUBLIC_REPLY',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Hello customer.',
+        attachments: [],
+      });
+
+    const result =
+      await service.createMessage(
+        tenant,
+        ticketId,
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Hello customer.',
+        },
+      );
+
+    expect(result.id).toBe(
+      messageId,
+    );
+
+    expect(
+      enqueueTicketReplyMock,
+    ).toHaveBeenCalledTimes(
+      1,
+    );
+
+    expect(
+      enqueueTicketReplyMock,
+    ).toHaveBeenCalledWith({
+      messageId,
+
+      organizationId:
+        tenant.organizationId,
+
+      ticketId,
+    });
+  },
+);
+
+it(
+  'does not queue email for internal notes',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'INTERNAL_NOTE',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Internal only.',
+        attachments: [],
+      });
+
+    await service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind: 'INTERNAL_NOTE',
+        body: 'Internal only.',
+      },
+    );
+
+    expect(
+      enqueueTicketReplyMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'keeps the public reply when email enqueueing fails',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'PUBLIC_REPLY',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Saved reply.',
+        attachments: [],
+      });
+
+    enqueueTicketReplyMock
+      .mockRejectedValue(
+        new Error(
+          'Redis unavailable',
+        ),
+      );
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Saved reply.',
+        },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'message-1',
+      }),
+    );
+  },
+);
 
 it('rejects public replies on closed tickets', async () => {
   transactionTicketFindFirstMock

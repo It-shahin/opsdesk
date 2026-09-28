@@ -20,6 +20,9 @@ import {
 import request from 'supertest';
 
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  JobsService,
+} from '../src/jobs/jobs.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { TenantContextService } from '../src/tenancy/tenant-context.service.js';
@@ -158,6 +161,8 @@ describe('Tickets HTTP security', () => {
   const txTicketFindFirstMock =
     jest.fn();
   const txTicketUpdateManyMock =
+    jest.fn();
+  const enqueueTicketReplyMock =
     jest.fn();
 
   const transactionClient = {
@@ -326,6 +331,13 @@ describe('Tickets HTTP security', () => {
             useValue: prisma,
           },
           {
+            provide: JobsService,
+            useValue: {
+              enqueueTicketReply:
+                enqueueTicketReplyMock,
+            },
+          },
+          {
             provide:
               TenantContextService,
             useValue: {
@@ -389,6 +401,11 @@ describe('Tickets HTTP security', () => {
         authorType: 'MEMBER',
         attachments: [],
       });
+
+    enqueueTicketReplyMock
+      .mockResolvedValue(
+        undefined,
+      );
   });
 
   afterAll(async () => {
