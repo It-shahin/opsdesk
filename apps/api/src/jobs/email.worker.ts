@@ -264,6 +264,8 @@ export class EmailWorker
         messageId:
           message.id,
 
+        ticketId,
+
         to:
           customerEmail,
 

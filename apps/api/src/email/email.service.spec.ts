@@ -83,6 +83,13 @@ describe(
                         return 'support@example.com';
                       }
 
+                      if (
+                        key ===
+                        'EMAIL_INBOUND_DOMAIN'
+                      ) {
+                        return 'inbound.resend.app';
+                      }
+
                       throw new Error(
                         `Missing ${key}`,
                       );
@@ -120,6 +127,9 @@ describe(
               messageId:
                 'message-123',
 
+              ticketId:
+                '819f42f7-5181-4eb7-9f33-256c89ff6f4c',
+
               to:
                 'customer@example.com',
 
@@ -143,6 +153,9 @@ describe(
             to: [
               'customer@example.com',
             ],
+
+            replyTo:
+              'ticket-819f42f7-5181-4eb7-9f33-256c89ff6f4c@inbound.resend.app',
 
             subject:
               'Re: Test',
@@ -190,6 +203,9 @@ describe(
           service.sendTicketReply({
             messageId:
               'message-123',
+
+            ticketId:
+              '819f42f7-5181-4eb7-9f33-256c89ff6f4c',
 
             to:
               'customer@example.com',

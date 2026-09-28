@@ -15,8 +15,15 @@ import {
   RESEND_CLIENT,
 } from './email.constants.js';
 
+import {
+  buildTicketReplyAddress,
+} from './inbound-email-routing.js';
+
 interface SendTicketReplyInput {
   messageId:
+    string;
+
+  ticketId:
     string;
 
   to:
@@ -35,6 +42,8 @@ interface SendTicketReplyInput {
 @Injectable()
 export class EmailService {
   private readonly from:
+    string;
+  private readonly inboundDomain:
     string;
 
   constructor(
@@ -60,42 +69,56 @@ export class EmailService {
 
     this.from =
       `${name} <${address}>`;
+
+    this.inboundDomain =
+      config.getOrThrow<string>(
+        'EMAIL_INBOUND_DOMAIN',
+      );
   }
 
   async sendTicketReply(
     input:
       SendTicketReplyInput,
   ) {
+
+    const replyTo =
+      buildTicketReplyAddress(
+        input.ticketId,
+        this.inboundDomain,
+      );
+
     const {
-      data,
-      error,
-    } =
-      await this.resend
-        .emails
-        .send(
-          {
-            from:
-              this.from,
+  data,
+  error,
+} =
+  await this.resend
+    .emails
+    .send(
+      {
+        from:
+          this.from,
 
-            to: [
-              input.to,
-            ],
+        to: [
+          input.to,
+        ],
 
-            subject:
-              input.subject,
+        replyTo,
 
-            text:
-              input.text,
+        subject:
+          input.subject,
 
-            html:
-              input.html,
-          },
+        text:
+          input.text,
 
-          {
-            idempotencyKey:
-              `ticket-reply/${input.messageId}`,
-          },
-        );
+        html:
+          input.html,
+      },
+
+      {
+        idempotencyKey:
+          `ticket-reply/${input.messageId}`,
+      },
+    );
 
     if (
       error
