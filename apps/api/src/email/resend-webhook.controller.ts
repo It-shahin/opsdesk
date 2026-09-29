@@ -23,6 +23,14 @@ import {
 } from './inbound-email.service.js';
 
 import {
+  OutboundEmailEventsService,
+} from './outbound-email-events.service.js';
+
+import type {
+  OutboundEmailEventType,
+} from './outbound-email-events.service.js';
+
+import {
   ResendWebhookVerificationService,
 } from './resend-webhook-verification.service.js';
 
@@ -33,6 +41,9 @@ export class ResendWebhookController {
   constructor(
     private readonly inboundEmail:
       InboundEmailService,
+
+    private readonly outboundEmailEvents:
+      OutboundEmailEventsService,
 
     private readonly verifier:
       ResendWebhookVerificationService,
@@ -97,79 +108,144 @@ export class ResendWebhookController {
       );
 
     if (
-      event.type !==
+      event.type ===
       'email.received'
     ) {
+      const data =
+        event.data;
+
+      if (
+        !data ||
+        typeof data !==
+          'object' ||
+        !(
+          'email_id'
+          in data
+        ) ||
+        typeof data.email_id !==
+          'string' ||
+        !(
+          'from'
+          in data
+        ) ||
+        typeof data.from !==
+          'string' ||
+        !(
+          'to'
+          in data
+        ) ||
+        !Array.isArray(
+          data.to,
+        )
+      ) {
+        throw new BadRequestException(
+          'Invalid email.received event',
+        );
+      }
+
+      const result =
+        await this.inboundEmail
+          .handleReceivedEmail(
+            {
+              emailId:
+                data.email_id,
+
+              from:
+                data.from,
+
+              to:
+                data.to,
+            },
+
+            {
+              webhookMessageId:
+                svixId,
+
+              providerEntityId:
+                data.email_id,
+
+              eventType:
+                'email.received',
+            },
+          );
+
       return {
         received:
           true,
+
+        result:
+          result.status,
       };
     }
 
-    const data =
-      event.data;
+    const outboundTypes =
+      new Set([
+        'email.sent',
+        'email.delivered',
+        'email.delivery_delayed',
+        'email.bounced',
+        'email.complained',
+        'email.suppressed',
+        'email.failed',
+      ]);
 
     if (
-      !data ||
-      typeof data !==
-        'object' ||
-      !(
-        'email_id'
-        in data
-      ) ||
-      typeof data.email_id !==
-        'string' ||
-      !(
-        'from'
-        in data
-      ) ||
-      typeof data.from !==
-        'string' ||
-      !(
-        'to'
-        in data
-      ) ||
-      !Array.isArray(
-        data.to,
+      outboundTypes.has(
+        event.type,
       )
     ) {
-      throw new BadRequestException(
-        'Invalid email.received event',
-      );
-    }
+      const data =
+        event.data as
+          | {
+          email_id?:
+            unknown;
 
-    const result =
-      await this.inboundEmail
-        .handleReceivedEmail(
-          {
-            emailId:
-              data.email_id,
+          tags?:
+            unknown;
+            }
+          | undefined;
 
-            from:
-              data.from,
-
-            to:
-              data.to,
-          },
-
-          {
-            webhookMessageId:
-              svixId,
-
-            providerEntityId:
-              data.email_id,
-
-            eventType:
-              'email.received',
-          },
+      if (
+        !data ||
+        typeof data.email_id !==
+          'string'
+      ) {
+        throw new BadRequestException(
+          'Invalid outbound email event',
         );
+      }
+
+      const result =
+        await this.outboundEmailEvents
+          .handle(
+            event.type as OutboundEmailEventType,
+
+            {
+              emailId:
+                data.email_id,
+
+              tags:
+                data.tags,
+            },
+
+            {
+              webhookMessageId:
+                svixId,
+            },
+          );
+
+      return {
+        received:
+          true,
+
+        result:
+          result.status,
+      };
+    }
 
     return {
       received:
         true,
-
-      result:
-        result.status,
     };
   }
 

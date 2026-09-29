@@ -3,7 +3,9 @@ export interface EmailSmokeTestJob {
 }
 
 export interface SendTicketReplyJob {
-  messageId: string;
-  organizationId: string;
-  ticketId: string;
+  emailDeliveryId: string;
+}
+
+export interface RecoverEmailDeliveriesJob {
+  requestedAt: string;
 }

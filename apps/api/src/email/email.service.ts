@@ -20,7 +20,7 @@ import {
 } from './inbound-email-routing.js';
 
 interface SendTicketReplyInput {
-  messageId:
+  deliveryId:
     string;
 
   ticketId:
@@ -37,6 +37,22 @@ interface SendTicketReplyInput {
 
   html:
     string;
+}
+
+export class EmailProviderError
+  extends Error
+{
+  constructor(
+    message: string,
+
+    public readonly retryable:
+      boolean,
+  ) {
+    super(message);
+
+    this.name =
+      'EmailProviderError';
+  }
 }
 
 @Injectable()
@@ -91,44 +107,80 @@ export class EmailService {
   data,
   error,
 } =
-  await this.resend
-    .emails
-    .send(
-      {
-        from:
-          this.from,
+  await this.resend.emails.send(
+    {
+      from:
+        this.from,
 
-        to: [
-          input.to,
-        ],
+      to: [
+        input.to,
+      ],
 
-        replyTo,
+      replyTo,
 
-        subject:
-          input.subject,
+      subject:
+        input.subject,
 
-        text:
-          input.text,
+      text:
+        input.text,
 
-        html:
-          input.html,
-      },
+      html:
+        input.html,
 
-      {
-        idempotencyKey:
-          `ticket-reply/${input.messageId}`,
-      },
-    );
+      tags: [
+        {
+          name:
+            'opsdesk_delivery_id',
+
+          value:
+            input.deliveryId,
+        },
+      ],
+    },
+
+    {
+      idempotencyKey:
+        `email-delivery/${input.deliveryId}`,
+    },
+  );
 
     if (
       error
     ) {
+      const statusCode =
+        typeof (
+          error as {
+            statusCode?:
+              unknown;
+          }
+        ).statusCode ===
+          'number'
+          ? (
+              error as {
+                statusCode:
+                  number;
+              }
+            ).statusCode
+          : undefined;
+
+      const retryable =
+        statusCode ===
+          undefined ||
+        statusCode ===
+          408 ||
+        statusCode ===
+          429 ||
+        statusCode >=
+          500;
+
       /*
        * Do not include recipient/body
        * in thrown/logged errors.
        */
-      throw new Error(
+      throw new EmailProviderError(
         `Resend email delivery failed: ${error.name}`,
+
+        retryable,
       );
     }
 

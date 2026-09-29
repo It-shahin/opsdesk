@@ -103,7 +103,8 @@ describe('Attachment HTTP security', () => {
   const txAttachmentUpdateManyMock = jest.fn();
   const txMessageCreateMock = jest.fn();
   const txMessageFindFirstMock = jest.fn();
-  const enqueueTicketReplyMock = jest.fn();
+  const txEmailDeliveryCreateMock = jest.fn();
+  const ensureEmailDeliveryQueuedMock = jest.fn();
 
   const transactionClient = {
     ticket: {
@@ -117,6 +118,9 @@ describe('Attachment HTTP security', () => {
     ticketMessage: {
       create: txMessageCreateMock,
       findFirst: txMessageFindFirstMock,
+    },
+    emailDelivery: {
+      create: txEmailDeliveryCreateMock,
     },
   };
 
@@ -211,7 +215,7 @@ describe('Attachment HTTP security', () => {
         {
           provide: JobsService,
           useValue: {
-            enqueueTicketReply: enqueueTicketReplyMock,
+            ensureEmailDeliveryQueued: ensureEmailDeliveryQueuedMock,
           },
         },
         { provide: ObjectStorageService, useValue: storage },
@@ -244,7 +248,11 @@ describe('Attachment HTTP security', () => {
     transactionMock.mockImplementation(async (callback) =>
       callback(transactionClient),
     );
-    enqueueTicketReplyMock.mockResolvedValue(undefined);
+    txEmailDeliveryCreateMock.mockResolvedValue({
+      id: 'email-delivery-1',
+      status: 'PENDING',
+    });
+    ensureEmailDeliveryQueuedMock.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -479,7 +487,13 @@ describe('Attachment HTTP security', () => {
   });
 
   it('atomically links an uploaded attachment to a message', async () => {
-    txTicketFindFirstMock.mockResolvedValue({ id: TICKET_A, status: 'OPEN' });
+    txTicketFindFirstMock.mockResolvedValue({
+      id: TICKET_A,
+      status: 'OPEN',
+      customer: {
+        email: 'customer@example.com',
+      },
+    });
     txAttachmentFindManyMock.mockResolvedValue([
       { id: ATTACHMENT_A, sizeBytes: 100 },
     ]);
@@ -535,11 +549,9 @@ describe('Attachment HTTP security', () => {
       },
       data: { messageId: MESSAGE_A },
     });
-    expect(enqueueTicketReplyMock).toHaveBeenCalledWith({
-      messageId: MESSAGE_A,
-      organizationId: ORG_A,
-      ticketId: TICKET_A,
-    });
+    expect(ensureEmailDeliveryQueuedMock).toHaveBeenCalledWith(
+      'email-delivery-1',
+    );
   });
 
   it('never queues email for internal notes', async () => {
@@ -568,7 +580,7 @@ describe('Attachment HTTP security', () => {
       })
       .expect(201);
 
-    expect(enqueueTicketReplyMock).not.toHaveBeenCalled();
+    expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
   });
 
   it('rejects an unavailable or already-linked attachment', async () => {

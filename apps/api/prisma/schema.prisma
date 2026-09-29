@@ -67,6 +67,18 @@ enum WebhookEventStatus {
   IGNORED
 }
 
+enum EmailDeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  DELAYED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  SUPPRESSED
+  FAILED
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -84,16 +96,17 @@ model User {
 }
 
 model Organization {
-  id          String          @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String          @unique
-  memberships Membership[]
-  invitations Invitation[]
-  customers   Customer[]
-  tickets     Ticket[]
-  tags        Tag[]
-  messages    TicketMessage[]
-  attachments Attachment[]
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String          @unique
+  memberships     Membership[]
+  invitations     Invitation[]
+  customers       Customer[]
+  tickets         Ticket[]
+  tags            Tag[]
+  messages        TicketMessage[]
+  attachments     Attachment[]
+  emailDeliveries EmailDelivery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -196,9 +209,10 @@ model Ticket {
   resolvedAt DateTime?
   closedAt   DateTime?
 
-  tagLinks    TicketTag[]
-  messages    TicketMessage[]
-  attachments Attachment[]
+  tagLinks        TicketTag[]
+  messages        TicketMessage[]
+  attachments     Attachment[]
+  emailDeliveries EmailDelivery[]
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -264,7 +278,8 @@ model TicketMessage {
 
   body String
 
-  attachments Attachment[]
+  attachments   Attachment[]
+  emailDelivery EmailDelivery?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -326,14 +341,46 @@ model WebhookEvent {
   status           WebhookEventStatus
   reason           String?
 
-  processedAt      DateTime           @default(now())
-  createdAt        DateTime           @default(now())
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@unique([provider, eventType, providerEntityId])
-
-  @@index([ webhookMessageId ])
-
+  @@index([webhookMessageId])
   @@index([provider, eventType, createdAt])
-
   @@map("webhook_events")
+}
+
+model EmailDelivery {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @db.Uuid
+  ticketId       String @db.Uuid
+  messageId      String @unique @db.Uuid
+
+  recipientEmail String?
+
+  status EmailDeliveryStatus @default(PENDING)
+
+  providerMessageId String? @unique
+
+  attemptCount Int @default(0)
+
+  lastAttemptAt DateTime?
+  lastError     String?
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticket       Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  message      TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@index([ticketId, createdAt])
+  @@index([status, createdAt])
+  @@map("email_deliveries")
 }

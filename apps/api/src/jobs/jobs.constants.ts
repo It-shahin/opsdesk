@@ -8,4 +8,7 @@ export const EMAIL_JOB_NAMES = {
 
   SEND_TICKET_REPLY:
     'email.send-ticket-reply',
+
+  RECOVER_PENDING:
+    'email.recover-pending',
 } as const;

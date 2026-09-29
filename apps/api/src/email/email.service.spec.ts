@@ -19,6 +19,7 @@ import {
 } from './email.constants.js';
 
 import {
+  EmailProviderError,
   EmailService,
 } from './email.service.js';
 
@@ -124,8 +125,8 @@ describe(
         const result =
           await service
             .sendTicketReply({
-              messageId:
-                'message-123',
+              deliveryId:
+                'delivery-123',
 
               ticketId:
                 '819f42f7-5181-4eb7-9f33-256c89ff6f4c',
@@ -165,11 +166,21 @@ describe(
 
             html:
               '<p>Hello</p>',
+
+            tags: [
+              {
+                name:
+                  'opsdesk_delivery_id',
+
+                value:
+                  'delivery-123',
+              },
+            ],
           },
 
           {
             idempotencyKey:
-              'ticket-reply/message-123',
+              'email-delivery/delivery-123',
           },
         );
 
@@ -196,13 +207,16 @@ describe(
 
               message:
                 'Provider details',
+
+              statusCode:
+                422,
             },
           });
 
         await expect(
           service.sendTicketReply({
-            messageId:
-              'message-123',
+            deliveryId:
+              'delivery-123',
 
             ticketId:
               '819f42f7-5181-4eb7-9f33-256c89ff6f4c',
@@ -219,9 +233,66 @@ describe(
             html:
               '<p>Hello</p>',
           }),
-        ).rejects.toThrow(
-          'Resend email delivery failed',
-        );
+        ).rejects.toMatchObject({
+          name:
+            'EmailProviderError',
+
+          message:
+            'Resend email delivery failed: validation_error',
+
+          retryable:
+            false,
+        } satisfies Partial<EmailProviderError>);
+      },
+    );
+
+    it(
+      'marks transient Resend failures as retryable',
+      async () => {
+        sendMock
+          .mockResolvedValue({
+            data:
+              null,
+
+            error: {
+              name:
+                'rate_limit_exceeded',
+
+              message:
+                'Try again later',
+
+              statusCode:
+                429,
+            },
+          });
+
+        await expect(
+          service.sendTicketReply({
+            deliveryId:
+              'delivery-123',
+
+            ticketId:
+              '819f42f7-5181-4eb7-9f33-256c89ff6f4c',
+
+            to:
+              'customer@example.com',
+
+            subject:
+              'Test',
+
+            text:
+              'Hello',
+
+            html:
+              '<p>Hello</p>',
+          }),
+        ).rejects.toMatchObject({
+          name:
+            'EmailProviderError',
+
+          retryable:
+            true,
+        } satisfies Partial<EmailProviderError>);
       },
     );
   },

@@ -162,7 +162,9 @@ describe('Tickets HTTP security', () => {
     jest.fn();
   const txTicketUpdateManyMock =
     jest.fn();
-  const enqueueTicketReplyMock =
+  const txEmailDeliveryCreateMock =
+    jest.fn();
+  const ensureEmailDeliveryQueuedMock =
     jest.fn();
 
   const transactionClient = {
@@ -177,6 +179,10 @@ describe('Tickets HTTP security', () => {
         txTicketMessageCreateMock,
       findFirst:
         txTicketMessageFindFirstMock,
+    },
+    emailDelivery: {
+      create:
+        txEmailDeliveryCreateMock,
     },
   };
 
@@ -333,8 +339,8 @@ describe('Tickets HTTP security', () => {
           {
             provide: JobsService,
             useValue: {
-              enqueueTicketReply:
-                enqueueTicketReplyMock,
+              ensureEmailDeliveryQueued:
+                ensureEmailDeliveryQueuedMock,
             },
           },
           {
@@ -402,7 +408,13 @@ describe('Tickets HTTP security', () => {
         attachments: [],
       });
 
-    enqueueTicketReplyMock
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'PENDING',
+      });
+
+    ensureEmailDeliveryQueuedMock
       .mockResolvedValue(
         undefined,
       );
@@ -711,6 +723,9 @@ describe('Tickets HTTP security', () => {
       .mockResolvedValue({
         id: TICKET_A,
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     await request(app.getHttpServer())
@@ -867,6 +882,9 @@ describe('Tickets HTTP security', () => {
       .mockResolvedValue({
         id: TICKET_A,
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
     txTicketMessageCreateMock
       .mockResolvedValue({

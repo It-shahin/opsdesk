@@ -16,6 +16,10 @@ import {
   EmailWorker,
 } from './jobs/email.worker.js';
 
+import {
+  JobsModule,
+} from './jobs/jobs.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -28,6 +32,8 @@ import {
     DatabaseModule,
 
     EmailModule,
+
+    JobsModule,
   ],
 
   providers: [EmailWorker],

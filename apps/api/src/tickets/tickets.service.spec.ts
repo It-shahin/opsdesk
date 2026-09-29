@@ -59,7 +59,10 @@ describe('TicketsService', () => {
   const txTicketMessageFindFirstMock =
     jest.fn();
 
-  const enqueueTicketReplyMock =
+  const txEmailDeliveryCreateMock =
+    jest.fn();
+
+  const ensureEmailDeliveryQueuedMock =
     jest.fn();
 
   const membershipFindFirstMock =
@@ -103,6 +106,11 @@ describe('TicketsService', () => {
 
       findFirst:
         txTicketMessageFindFirstMock,
+    },
+
+    emailDelivery: {
+      create:
+        txEmailDeliveryCreateMock,
     },
   };
 
@@ -220,7 +228,13 @@ describe('TicketsService', () => {
         attachments: [],
       });
 
-    enqueueTicketReplyMock
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'PENDING',
+      });
+
+    ensureEmailDeliveryQueuedMock
       .mockResolvedValue(
         undefined,
       );
@@ -229,8 +243,8 @@ describe('TicketsService', () => {
       new TicketsService(
         prisma as unknown as PrismaService,
         {
-          enqueueTicketReply:
-            enqueueTicketReplyMock,
+          ensureEmailDeliveryQueued:
+            ensureEmailDeliveryQueuedMock,
         } as unknown as JobsService,
       );
   });
@@ -963,6 +977,9 @@ describe('TicketsService', () => {
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'OPEN',
+      customer: {
+        email: 'customer@example.com',
+      },
     });
 
   txTicketMessageCreateMock
@@ -1090,6 +1107,9 @@ it(
       .mockResolvedValue({
         id: ticketId,
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     txTicketMessageCreateMock
@@ -1122,21 +1142,98 @@ it(
     );
 
     expect(
-      enqueueTicketReplyMock,
+      txEmailDeliveryCreateMock,
+    ).toHaveBeenCalledWith({
+      data: {
+        organizationId:
+          tenant.organizationId,
+        ticketId,
+        messageId,
+        recipientEmail:
+          'customer@example.com',
+        status: 'PENDING',
+        failedAt: null,
+        lastError: null,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    expect(
+      txEmailDeliveryCreateMock,
     ).toHaveBeenCalledTimes(
       1,
     );
 
     expect(
-      enqueueTicketReplyMock,
+      ensureEmailDeliveryQueuedMock,
+    ).toHaveBeenCalledWith(
+      'email-delivery-1',
+    );
+  },
+);
+
+it(
+  'records a failed delivery when the customer has no email address',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+        customer: {
+          email: null,
+        },
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'PUBLIC_REPLY',
+        attachments: [],
+      });
+
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'FAILED',
+      });
+
+    await service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind: 'PUBLIC_REPLY',
+        body: 'Hello customer.',
+      },
+    );
+
+    expect(
+      txEmailDeliveryCreateMock,
     ).toHaveBeenCalledWith({
-      messageId,
-
-      organizationId:
-        tenant.organizationId,
-
-      ticketId,
+      data: expect.objectContaining({
+        recipientEmail: null,
+        status: 'FAILED',
+        failedAt:
+          expect.any(Date),
+        lastError:
+          'Customer has no email address',
+      }),
+      select: {
+        id: true,
+        status: true,
+      },
     });
+
+    expect(
+      ensureEmailDeliveryQueuedMock,
+    ).not.toHaveBeenCalled();
   },
 );
 
@@ -1147,6 +1244,9 @@ it(
       .mockResolvedValue({
         id: 'ticket-1',
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     txTicketMessageCreateMock
@@ -1174,7 +1274,7 @@ it(
     );
 
     expect(
-      enqueueTicketReplyMock,
+      ensureEmailDeliveryQueuedMock,
     ).not.toHaveBeenCalled();
   },
 );
@@ -1186,6 +1286,9 @@ it(
       .mockResolvedValue({
         id: 'ticket-1',
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     txTicketMessageCreateMock
@@ -1203,7 +1306,7 @@ it(
         attachments: [],
       });
 
-    enqueueTicketReplyMock
+    ensureEmailDeliveryQueuedMock
       .mockRejectedValue(
         new Error(
           'Redis unavailable',
@@ -1321,6 +1424,9 @@ it(
       .mockResolvedValue({
         id: 'ticket-1',
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     txAttachmentFindManyMock

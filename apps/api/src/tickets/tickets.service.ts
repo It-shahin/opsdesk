@@ -8,6 +8,7 @@ import {
 
 import { PrismaService } from '../database/prisma.service.js';
 import type {
+  EmailDeliveryStatus,
   TicketPriority,
   TicketStatus,
 } from '../generated/prisma/enums.js';
@@ -591,7 +592,13 @@ async updateStatus(
           select: {
             id: true,
             status: true,
-          },
+
+            customer: {
+              select: {
+                email: true,
+              },
+            },
+          }
         });
 
       if (!ticket) {
@@ -1049,6 +1056,17 @@ private messageSelect() {
       },
     },
 
+    emailDelivery: {
+      select: {
+        id: true,
+        status: true,
+        sentAt: true,
+        deliveredAt: true,
+        failedAt: true,
+        createdAt: true,
+      },
+    },
+
     attachments: {
       select: {
         id: true,
@@ -1098,9 +1116,12 @@ async createMessage(
     );
   }
 
-  const message =
+  const {
+    message,
+    emailDelivery,
+  } =
     await this.prisma.$transaction(
-    async (transaction) => {
+      async (transaction) => {
       const ticket =
         await transaction.ticket.findFirst({
           where: {
@@ -1113,6 +1134,12 @@ async createMessage(
           select: {
             id: true,
             status: true,
+
+            customer: {
+              select: {
+                email: true,
+              },
+            },
           },
         });
 
@@ -1200,7 +1227,7 @@ async createMessage(
         }
       }
 
-      const message =
+      const createdMessage =
         await transaction.ticketMessage.create({
           data: {
             organizationId:
@@ -1257,7 +1284,7 @@ async createMessage(
 
             data: {
               messageId:
-                message.id,
+                createdMessage.id,
             },
           });
 
@@ -1271,11 +1298,72 @@ async createMessage(
         }
       }
 
+      let emailDelivery:
+        {
+          id: string;
+          status:
+            EmailDeliveryStatus;
+        } | null =
+        null;
+
+      if (
+        input.kind ===
+        'PUBLIC_REPLY'
+      ) {
+        const recipientEmail =
+          ticket.customer.email
+            ?.trim()
+            .toLowerCase() ||
+          null;
+
+        const hasRecipient =
+          recipientEmail !==
+          null;
+
+        emailDelivery =
+          await transaction
+            .emailDelivery
+            .create({
+              data: {
+                organizationId:
+                  tenant.organizationId,
+
+                ticketId:
+                  ticket.id,
+
+                messageId:
+                  createdMessage.id,
+
+                recipientEmail,
+
+                status:
+                  hasRecipient
+                    ? 'PENDING'
+                    : 'FAILED',
+
+                failedAt:
+                  hasRecipient
+                    ? null
+                    : new Date(),
+
+                lastError:
+                  hasRecipient
+                    ? null
+                    : 'Customer has no email address',
+              },
+
+              select: {
+                id: true,
+                status: true,
+              },
+            });
+      }
+
       const result =
         await transaction.ticketMessage.findFirst({
           where: {
             id:
-              message.id,
+              createdMessage.id,
 
             organizationId:
               tenant.organizationId,
@@ -1294,28 +1382,27 @@ async createMessage(
         );
       }
 
-      return result;
-    },
-  );
+      return {
+        message:
+          result,
+
+        emailDelivery,
+      };
+      },
+    );
 
   if (
-    input.kind ===
-    'PUBLIC_REPLY'
+    emailDelivery?.status ===
+    'PENDING'
   ) {
     try {
       await this.jobsService
-        .enqueueTicketReply({
-          messageId:
-            message.id,
-
-          organizationId:
-            tenant.organizationId,
-
-          ticketId,
-        });
+        .ensureEmailDeliveryQueued(
+          emailDelivery.id,
+        );
     } catch (error) {
       this.logger.error(
-        `Failed to enqueue outbound email for message ${message.id}`,
+        `Failed to queue email delivery ${emailDelivery.id}`,
         error instanceof Error
           ? error.stack
           : undefined,

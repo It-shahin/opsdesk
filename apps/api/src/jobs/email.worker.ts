@@ -30,10 +30,15 @@ import type {
 } from './jobs.types.js';
 
 import {
+  JobsService,
+} from './jobs.service.js';
+
+import {
   PrismaService,
 } from '../database/prisma.service.js';
 
 import {
+  EmailProviderError,
   EmailService,
 } from '../email/email.service.js';
 
@@ -67,6 +72,9 @@ export class EmailWorker
 
   private readonly emailService:
     EmailService,
+
+  private readonly jobsService:
+    JobsService,
 ) {
   this.connection =
     createWorkerRedisConnection(
@@ -143,6 +151,11 @@ export class EmailWorker
           job as Job<SendTicketReplyJob>,
         );
 
+      case EMAIL_JOB_NAMES
+        .RECOVER_PENDING:
+        return this
+          .processRecovery();
+
       default:
         throw new Error(
           `Unsupported job type: ${job.name}`,
@@ -166,118 +179,397 @@ export class EmailWorker
   }
 
   private async processTicketReply(
-  job:
-    Job<SendTicketReplyJob>,
-) {
-  const {
-    messageId,
-    organizationId,
-    ticketId,
-  } =
-    job.data;
+    job:
+      Job<SendTicketReplyJob>,
+  ) {
+    const delivery =
+      await this.prisma
+        .emailDelivery
+        .findUnique({
+          where: {
+            id:
+              job.data
+                .emailDeliveryId,
+          },
 
-  const message =
-    await this.prisma
-      .ticketMessage
-      .findFirst({
-        where: {
-          id:
-            messageId,
+          select: {
+            id: true,
+            status: true,
+            recipientEmail: true,
 
-          organizationId,
+            message: {
+              select: {
+                id: true,
+                kind: true,
+                authorType: true,
+                body: true,
 
-          ticketId,
+                ticket: {
+                  select: {
+                    id: true,
+                    subject: true,
 
-          kind:
-            'PUBLIC_REPLY',
-
-          authorType:
-            'MEMBER',
-        },
-
-        select: {
-          id:
-            true,
-
-          body:
-            true,
-
-          ticket: {
-            select: {
-              subject:
-                true,
-
-              customer: {
-                select: {
-                  name:
-                    true,
-
-                  email:
-                    true,
+                    customer: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
                 },
               },
             },
           },
+        });
+
+    if (!delivery) {
+      throw new UnrecoverableError(
+        'Email delivery not found',
+      );
+    }
+
+    const terminalStatuses =
+      new Set([
+        'SENT',
+        'DELIVERED',
+        'BOUNCED',
+        'COMPLAINED',
+        'SUPPRESSED',
+        'FAILED',
+      ]);
+
+    if (
+      terminalStatuses.has(
+        delivery.status,
+      )
+    ) {
+      return {
+        skipped:
+          true,
+
+        status:
+          delivery.status,
+      };
+    }
+
+    const claimed =
+      await this.prisma
+        .emailDelivery
+        .updateMany({
+          where: {
+            id:
+              delivery.id,
+
+            status:
+              'PENDING',
+          },
+
+          data: {
+            status:
+              'SENDING',
+
+            attemptCount: {
+              increment:
+                1,
+            },
+
+            lastAttemptAt:
+              new Date(),
+
+            lastError:
+              null,
+          },
+        });
+
+    if (
+      claimed.count !==
+      1
+    ) {
+      return {
+        skipped:
+          true,
+      };
+    }
+
+    if (
+      !delivery.recipientEmail
+    ) {
+      await this.prisma
+        .emailDelivery
+        .updateMany({
+          where: {
+            id:
+              delivery.id,
+
+            status:
+              'SENDING',
+          },
+
+          data: {
+            status:
+              'FAILED',
+
+            failedAt:
+              new Date(),
+
+            lastError:
+              'Recipient email is missing',
+          },
+        });
+
+      throw new UnrecoverableError(
+        'Recipient email is missing',
+      );
+    }
+
+    if (
+      delivery.message.kind !==
+        'PUBLIC_REPLY' ||
+      delivery.message.authorType !==
+        'MEMBER'
+    ) {
+      throw new UnrecoverableError(
+        'Email delivery references an invalid message',
+      );
+    }
+
+    const email =
+      buildTicketReplyEmail({
+        customerName:
+          delivery.message
+            .ticket
+            .customer
+            .name,
+
+        ticketSubject:
+          delivery.message
+            .ticket
+            .subject,
+
+        body:
+          delivery.message
+            .body,
+      });
+
+    try {
+      const result =
+        await this.emailService
+          .sendTicketReply({
+            deliveryId:
+              delivery.id,
+
+            ticketId:
+              delivery.message
+                .ticket
+                .id,
+
+            to:
+              delivery.recipientEmail,
+
+            ...email,
+          });
+
+      await this.prisma
+        .emailDelivery
+        .updateMany({
+          where: {
+            id:
+              delivery.id,
+
+            status:
+              'SENDING',
+          },
+
+          data: {
+            status:
+              'SENT',
+
+            providerMessageId:
+              result.providerMessageId,
+
+            sentAt:
+              new Date(),
+
+            lastError:
+              null,
+          },
+        });
+
+      await this.prisma
+        .emailDelivery
+        .updateMany({
+          where: {
+            id:
+              delivery.id,
+
+            providerMessageId:
+              null,
+          },
+
+          data: {
+            providerMessageId:
+              result.providerMessageId,
+          },
+        });
+
+      this.logger.log(
+        `Sent email delivery ${delivery.id}; provider message ${result.providerMessageId}`,
+      );
+
+      return result;
+    } catch (error) {
+      const maxAttempts =
+        job.opts.attempts ??
+        1;
+
+      const thisWasFinalAttempt =
+        job.attemptsMade +
+          1 >=
+        maxAttempts;
+
+      const retryable =
+        error instanceof
+          EmailProviderError
+          ? error.retryable
+          : true;
+
+      const safeError =
+        error instanceof Error
+          ? error.name
+          : 'UnknownEmailError';
+
+      if (
+        !retryable ||
+        thisWasFinalAttempt
+      ) {
+        await this.prisma
+          .emailDelivery
+          .updateMany({
+            where: {
+              id:
+                delivery.id,
+
+              status:
+                'SENDING',
+            },
+
+            data: {
+              status:
+                'FAILED',
+
+              failedAt:
+                new Date(),
+
+              lastError:
+                safeError,
+            },
+          });
+
+        if (!retryable) {
+          throw new UnrecoverableError(
+            'Permanent email delivery failure',
+          );
+        }
+
+        throw error;
+      }
+
+      await this.prisma
+        .emailDelivery
+        .updateMany({
+          where: {
+            id:
+              delivery.id,
+
+            status:
+              'SENDING',
+          },
+
+          data: {
+            status:
+              'PENDING',
+
+            lastError:
+              safeError,
+          },
+        });
+
+      throw error;
+    }
+  }
+
+  private async processRecovery() {
+    const staleBefore =
+      new Date(
+        Date.now() -
+        10 * 60 * 1000,
+      );
+
+    await this.prisma
+      .emailDelivery
+      .updateMany({
+        where: {
+          status:
+            'SENDING',
+
+          lastAttemptAt: {
+            lt:
+              staleBefore,
+          },
+        },
+
+        data: {
+          status:
+            'PENDING',
+
+          lastError:
+            'Recovered stale sending attempt',
         },
       });
 
-  if (
-    !message
-  ) {
-    throw new UnrecoverableError(
-      'Ticket reply message was not found',
-    );
+    const pending =
+      await this.prisma
+        .emailDelivery
+        .findMany({
+          where: {
+            status:
+              'PENDING',
+          },
+
+          select: {
+            id:
+              true,
+          },
+
+          orderBy: {
+            createdAt:
+              'asc',
+          },
+
+          take:
+            100,
+        });
+
+    for (
+      const delivery
+      of pending
+    ) {
+      try {
+        await this.jobsService
+          .ensureEmailDeliveryQueued(
+            delivery.id,
+          );
+      } catch {
+        this.logger.error(
+          `Failed to recover email delivery ${delivery.id}`,
+        );
+      }
+    }
+
+    return {
+      recovered:
+        pending.length,
+    };
   }
-
-  const customerEmail =
-    message.ticket
-      .customer
-      .email
-      ?.trim();
-
-  if (
-    !customerEmail
-  ) {
-    throw new UnrecoverableError(
-      'Ticket customer has no email address',
-    );
-  }
-
-  const email =
-    buildTicketReplyEmail({
-      customerName:
-        message.ticket
-          .customer
-          .name,
-
-      ticketSubject:
-        message.ticket
-          .subject,
-
-      body:
-        message.body,
-    });
-
-  const result =
-    await this.emailService
-      .sendTicketReply({
-        messageId:
-          message.id,
-
-        ticketId,
-
-        to:
-          customerEmail,
-
-        ...email,
-      });
-
-  this.logger.log(
-    `Sent ticket reply for message ${message.id}; provider message ${result.providerMessageId}`,
-  );
-
-  return result;
-}
 
   async onModuleDestroy() {
     if (
