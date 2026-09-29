@@ -43,6 +43,15 @@ describe(
     const txTicketUpdateManyMock =
       jest.fn();
 
+    const webhookEventFindFirstMock =
+      jest.fn();
+
+    const webhookEventCreateMock =
+      jest.fn();
+
+    const txWebhookEventCreateMock =
+      jest.fn();
+
     const transactionClient = {
       ticketMessage: {
         create:
@@ -52,6 +61,11 @@ describe(
       ticket: {
         updateMany:
           txTicketUpdateManyMock,
+      },
+
+      webhookEvent: {
+        create:
+          txWebhookEventCreateMock,
       },
     };
 
@@ -71,6 +85,14 @@ describe(
       ticket: {
         findFirst:
           ticketFindFirstMock,
+      },
+
+      webhookEvent: {
+        findFirst:
+          webhookEventFindFirstMock,
+
+        create:
+          webhookEventCreateMock,
       },
 
       $transaction:
@@ -113,6 +135,23 @@ describe(
             ),
         );
 
+      webhookEventFindFirstMock
+        .mockResolvedValue(
+          null,
+        );
+
+      webhookEventCreateMock
+        .mockResolvedValue({
+          id:
+            'webhook-event-1',
+        });
+
+      txWebhookEventCreateMock
+        .mockResolvedValue({
+          id:
+            'webhook-event-1',
+        });
+
       service =
         new InboundEmailService(
           prisma as unknown as PrismaService,
@@ -122,7 +161,7 @@ describe(
     });
 
     it(
-      'creates a trusted customer message and reopens the ticket',
+      'creates exactly one message for a verified inbound email',
       async () => {
         getReceivedEmailMock
           .mockResolvedValue({
@@ -179,17 +218,61 @@ describe(
 
         const result =
           await service
-            .handleReceivedEmail({
-              emailId:
-                'received-email-1',
+            .handleReceivedEmail(
+              {
+                emailId:
+                  'received-email-1',
 
-              from:
-                'Jane <jane@example.com>',
+                from:
+                  'Jane <jane@example.com>',
 
-              to: [
-                `ticket-${TICKET_ID}@abc.resend.app`,
-              ],
-            });
+                to: [
+                  `ticket-${TICKET_ID}@abc.resend.app`,
+                ],
+              },
+
+              {
+                webhookMessageId:
+                  'webhook-message-1',
+
+                providerEntityId:
+                  'received-email-1',
+
+                eventType:
+                  'email.received',
+              },
+            );
+
+        expect(
+          txWebhookEventCreateMock,
+        ).toHaveBeenCalledWith({
+          data: {
+            provider:
+              'RESEND',
+
+            eventType:
+              'email.received',
+
+            providerEntityId:
+              'received-email-1',
+
+            webhookMessageId:
+              'webhook-message-1',
+
+            status:
+              'PROCESSED',
+          },
+        });
+
+        expect(
+          txWebhookEventCreateMock
+            .mock
+            .invocationCallOrder[0],
+        ).toBeLessThan(
+          txMessageCreateMock
+            .mock
+            .invocationCallOrder[0],
+        );
 
         expect(
           txMessageCreateMock,
@@ -265,6 +348,58 @@ describe(
     );
 
     it(
+      'ignores an already processed inbound email',
+      async () => {
+        webhookEventFindFirstMock
+          .mockResolvedValue({
+            id:
+              'event-id',
+          });
+
+        const result =
+          await service
+            .handleReceivedEmail(
+              {
+                emailId:
+                  'resend-email-123',
+
+                from:
+                  'jane@example.com',
+
+                to: [
+                  `ticket-${TICKET_ID}@abc.resend.app`,
+                ],
+              },
+
+              {
+                webhookMessageId:
+                  'another-svix-id',
+
+                providerEntityId:
+                  'resend-email-123',
+
+                eventType:
+                  'email.received',
+              },
+            );
+
+        expect(
+          result.status,
+        ).toBe(
+          'duplicate',
+        );
+
+        expect(
+          getReceivedEmailMock,
+        ).not.toHaveBeenCalled();
+
+        expect(
+          txMessageCreateMock,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it(
       'ignores email from a sender other than the ticket customer',
       async () => {
         getReceivedEmailMock
@@ -302,17 +437,30 @@ describe(
 
         const result =
           await service
-            .handleReceivedEmail({
-              emailId:
-                'received-email-2',
+            .handleReceivedEmail(
+              {
+                emailId:
+                  'received-email-2',
 
-              from:
-                'attacker@example.com',
+                from:
+                  'attacker@example.com',
 
-              to: [
-                `ticket-${TICKET_ID}@abc.resend.app`,
-              ],
-            });
+                to: [
+                  `ticket-${TICKET_ID}@abc.resend.app`,
+                ],
+              },
+
+              {
+                webhookMessageId:
+                  'webhook-message-2',
+
+                providerEntityId:
+                  'received-email-2',
+
+                eventType:
+                  'email.received',
+              },
+            );
 
         expect(result).toEqual({
           status:
@@ -328,6 +476,90 @@ describe(
 
         expect(
           transactionMock,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it(
+      'handles concurrent duplicate webhook claims',
+      async () => {
+        getReceivedEmailMock
+          .mockResolvedValue({
+            from:
+              'Jane <jane@example.com>',
+
+            to: [
+              `ticket-${TICKET_ID}@abc.resend.app`,
+            ],
+
+            text:
+              'Repeated delivery.',
+
+            html:
+              null,
+          });
+
+        ticketFindFirstMock
+          .mockResolvedValue({
+            id:
+              TICKET_ID,
+
+            organizationId:
+              ORG_ID,
+
+            status:
+              'PENDING',
+
+            customer: {
+              email:
+                'jane@example.com',
+            },
+          });
+
+        txWebhookEventCreateMock
+          .mockRejectedValue({
+            code:
+              'P2002',
+          });
+
+        const result =
+          await service
+            .handleReceivedEmail(
+              {
+                emailId:
+                  'received-email-3',
+
+                from:
+                  'Jane <jane@example.com>',
+
+                to: [
+                  `ticket-${TICKET_ID}@abc.resend.app`,
+                ],
+              },
+
+              {
+                webhookMessageId:
+                  'webhook-message-3',
+
+                providerEntityId:
+                  'received-email-3',
+
+                eventType:
+                  'email.received',
+              },
+            );
+
+        expect(result).toEqual({
+          status:
+            'duplicate',
+        });
+
+        expect(
+          txMessageCreateMock,
+        ).not.toHaveBeenCalled();
+
+        expect(
+          txTicketUpdateManyMock,
         ).not.toHaveBeenCalled();
       },
     );

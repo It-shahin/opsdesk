@@ -31,6 +31,17 @@ interface EmailReceivedEvent {
     string[];
 }
 
+interface WebhookIdentity {
+  webhookMessageId:
+    string;
+
+  providerEntityId:
+    string;
+
+  eventType:
+    'email.received';
+}
+
 @Injectable()
 export class InboundEmailService {
   private readonly logger =
@@ -40,6 +51,86 @@ export class InboundEmailService {
 
   private readonly inboundDomain:
     string;
+
+  private isUniqueConstraintError(
+    error:
+        unknown,
+    ): boolean {
+    if (
+        typeof error !==
+        'object' ||
+        error === null ||
+        !(
+        'code'
+        in error
+        )
+    ) {
+        return false;
+    }
+
+    return (
+        (
+        error as {
+            code?:
+            unknown;
+        }
+        ).code ===
+        'P2002'
+    );
+    }
+
+    private async recordIgnoredEvent(
+        identity:
+            WebhookIdentity,
+
+        reason:
+            string,
+        ) {
+        try {
+            await this.prisma
+            .webhookEvent
+            .create({
+                data: {
+                provider:
+                    'RESEND',
+
+                eventType:
+                    identity.eventType,
+
+                providerEntityId:
+                    identity.providerEntityId,
+
+                webhookMessageId:
+                    identity.webhookMessageId,
+
+                status:
+                    'IGNORED',
+
+                reason,
+                },
+            });
+
+            return {
+            status:
+                'ignored' as const,
+
+            reason,
+            };
+        } catch (error) {
+            if (
+            this.isUniqueConstraintError(
+                error,
+            )
+            ) {
+            return {
+                status:
+                'duplicate' as const,
+            };
+            }
+
+            throw error;
+        }
+        }
 
   constructor(
     private readonly prisma:
@@ -58,9 +149,42 @@ export class InboundEmailService {
   }
 
   async handleReceivedEmail(
-    event:
-      EmailReceivedEvent,
-  ) {
+  event:
+    EmailReceivedEvent,
+
+  identity:
+    WebhookIdentity,
+) {
+
+    const existingEvent =
+        await this.prisma
+            .webhookEvent
+            .findFirst({
+            where: {
+                provider:
+                'RESEND',
+
+                eventType:
+                identity.eventType,
+
+                providerEntityId:
+                identity.providerEntityId,
+            },
+
+            select: {
+                id:
+                true,
+            },
+            });
+
+        if (
+        existingEvent
+        ) {
+        return {
+            status:
+            'duplicate' as const,
+            };
+        }
     /*
      * Retrieve the email again from
      * Resend rather than trusting
@@ -88,13 +212,10 @@ export class InboundEmailService {
         'Ignoring inbound email with no ticket recipient',
       );
 
-      return {
-        status:
-          'ignored' as const,
-
-        reason:
-          'unknown-recipient',
-      };
+      return this.recordIgnoredEvent(
+        identity,
+        'unknown-recipient',
+        );
     }
 
     const ticket =
@@ -133,13 +254,10 @@ export class InboundEmailService {
         `Ignoring inbound email for unknown ticket ${ticketId}`,
       );
 
-      return {
-        status:
-          'ignored' as const,
-
-        reason:
-          'ticket-not-found',
-      };
+      return this.recordIgnoredEvent(
+        identity,
+        'ticket-not-found',
+        );
     }
 
     const sender =
@@ -162,13 +280,10 @@ export class InboundEmailService {
         `Ignoring inbound sender mismatch for ticket ${ticketId}`,
       );
 
-      return {
-        status:
-          'ignored' as const,
-
-        reason:
-          'sender-mismatch',
-      };
+      return this.recordIgnoredEvent(
+        identity,
+        'sender-mismatch',
+        );
     }
 
     const body =
@@ -182,113 +297,156 @@ export class InboundEmailService {
         `Ignoring empty inbound email for ticket ${ticketId}`,
       );
 
-      return {
-        status:
-          'ignored' as const,
-
-        reason:
-          'empty-body',
-      };
+      return this.recordIgnoredEvent(
+        identity,
+        'empty-body',
+        );
     }
 
-    const message =
-      await this.prisma
-        .$transaction(
-          async (
-            transaction,
-          ) => {
-            const created =
+    try {
+      const message =
+        await this.prisma
+          .$transaction(
+            async (
+              transaction,
+            ) => {
+              /*
+               * Claim the inbound email.
+               *
+               * Unique constraint protects
+               * against retries/replays.
+               */
               await transaction
-                .ticketMessage
+                .webhookEvent
                 .create({
                   data: {
-                    organizationId:
-                      ticket.organizationId,
+                    provider:
+                      'RESEND',
 
-                    ticketId:
-                      ticket.id,
+                    eventType:
+                      identity.eventType,
 
-                    authorMembershipId:
-                      null,
+                    providerEntityId:
+                      identity.providerEntityId,
 
-                    kind:
-                      'PUBLIC_REPLY',
+                    webhookMessageId:
+                      identity.webhookMessageId,
 
-                    authorType:
-                      'CUSTOMER',
-
-                    source:
-                      'EMAIL',
-
-                    body,
-                  },
-
-                  select: {
-                    id:
-                      true,
-
-                    ticketId:
-                      true,
-
-                    organizationId:
-                      true,
-
-                    createdAt:
-                      true,
+                    status:
+                      'PROCESSED',
                   },
                 });
 
-            /*
-             * A customer reply means
-             * this ticket requires
-             * agent attention again.
-             */
-            await transaction
-              .ticket
-              .updateMany({
-                where: {
-                  id:
-                    ticket.id,
+              const created =
+                await transaction
+                  .ticketMessage
+                  .create({
+                    data: {
+                      organizationId:
+                        ticket.organizationId,
 
-                  organizationId:
-                    ticket.organizationId,
+                      ticketId:
+                        ticket.id,
 
-                  status: {
-                    in: [
-                      'PENDING',
-                      'RESOLVED',
-                      'CLOSED',
-                    ],
+                      authorMembershipId:
+                        null,
+
+                      kind:
+                        'PUBLIC_REPLY',
+
+                      authorType:
+                        'CUSTOMER',
+
+                      source:
+                        'EMAIL',
+
+                      body,
+                    },
+
+                    select: {
+                      id:
+                        true,
+
+                      ticketId:
+                        true,
+
+                      organizationId:
+                        true,
+
+                      createdAt:
+                        true,
+                    },
+                  });
+
+              /*
+               * A customer reply means
+               * this ticket requires
+               * agent attention again.
+               */
+              await transaction
+                .ticket
+                .updateMany({
+                  where: {
+                    id:
+                      ticket.id,
+
+                    organizationId:
+                      ticket.organizationId,
+
+                    status: {
+                      in: [
+                        'PENDING',
+                        'RESOLVED',
+                        'CLOSED',
+                      ],
+                    },
                   },
-                },
 
-                data: {
-                  status:
-                    'OPEN',
+                  data: {
+                    status:
+                      'OPEN',
 
-                  resolvedAt:
-                    null,
+                    resolvedAt:
+                      null,
 
-                  closedAt:
-                    null,
-                },
-              });
+                    closedAt:
+                      null,
+                  },
+                });
 
-            return created;
-          },
+              return created;
+            },
+          );
+
+      this.logger.log(
+        `Created inbound customer message ${message.id} for ticket ${ticket.id}`,
+      );
+
+      return {
+        status:
+          'created' as const,
+
+        messageId:
+          message.id,
+      };
+    } catch (error) {
+      if (
+        this.isUniqueConstraintError(
+          error,
+        )
+      ) {
+        this.logger.log(
+          `Ignoring duplicate inbound email ${identity.providerEntityId}`,
         );
 
-    this.logger.log(
-      `Created inbound customer message ${message.id} for ticket ${ticket.id}`,
-    );
+        return {
+          status:
+            'duplicate' as const,
+        };
+      }
 
-    return {
-      status:
-        'created' as const,
-
-      messageId:
-        message.id,
-    };
+      throw error;
+    }
   }
 
   private extractBody(

@@ -26,6 +26,10 @@ import {
   ResendWebhookController,
 } from './resend-webhook.controller.js';
 
+import {
+  ResendWebhookVerificationService,
+} from './resend-webhook-verification.service.js';
+
 @Module({
   controllers: [
     ResendWebhookController,
@@ -54,6 +58,7 @@ import {
 
     InboundEmailProviderService,
     InboundEmailService,
+    ResendWebhookVerificationService,
   ],
 })
 export class InboundEmailModule {}

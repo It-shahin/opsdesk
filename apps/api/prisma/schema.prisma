@@ -58,6 +58,15 @@ enum AttachmentStatus {
   UPLOADED
 }
 
+enum WebhookProvider {
+  RESEND
+}
+
+enum WebhookEventStatus {
+  PROCESSED
+  IGNORED
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -306,4 +315,25 @@ model Attachment {
   @@index([createdByMembershipId])
   @@index([organizationId, status, createdAt])
   @@map("attachments")
+}
+
+model WebhookEvent {
+  id               String             @id @default(uuid()) @db.Uuid
+  provider         WebhookProvider
+  eventType        String
+  providerEntityId String
+  webhookMessageId String?
+  status           WebhookEventStatus
+  reason           String?
+
+  processedAt      DateTime           @default(now())
+  createdAt        DateTime           @default(now())
+
+  @@unique([provider, eventType, providerEntityId])
+
+  @@index([ webhookMessageId ])
+
+  @@index([provider, eventType, createdAt])
+
+  @@map("webhook_events")
 }
