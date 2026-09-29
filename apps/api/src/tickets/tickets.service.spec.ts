@@ -17,6 +17,9 @@ import {
 } from '@jest/globals';
 
 import { PrismaService } from '../database/prisma.service.js';
+import {
+  JobsService,
+} from '../jobs/jobs.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 import { TicketsService } from './tickets.service.js';
 
@@ -54,6 +57,12 @@ describe('TicketsService', () => {
     jest.fn();
 
   const txTicketMessageFindFirstMock =
+    jest.fn();
+
+  const txEmailDeliveryCreateMock =
+    jest.fn();
+
+  const ensureEmailDeliveryQueuedMock =
     jest.fn();
 
   const membershipFindFirstMock =
@@ -97,6 +106,11 @@ describe('TicketsService', () => {
 
       findFirst:
         txTicketMessageFindFirstMock,
+    },
+
+    emailDelivery: {
+      create:
+        txEmailDeliveryCreateMock,
     },
   };
 
@@ -214,9 +228,24 @@ describe('TicketsService', () => {
         attachments: [],
       });
 
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'PENDING',
+      });
+
+    ensureEmailDeliveryQueuedMock
+      .mockResolvedValue(
+        undefined,
+      );
+
     service =
       new TicketsService(
         prisma as unknown as PrismaService,
+        {
+          ensureEmailDeliveryQueued:
+            ensureEmailDeliveryQueuedMock,
+        } as unknown as JobsService,
       );
   });
 
@@ -948,6 +977,9 @@ describe('TicketsService', () => {
     .mockResolvedValue({
       id: 'ticket-1',
       status: 'OPEN',
+      customer: {
+        email: 'customer@example.com',
+      },
     });
 
   txTicketMessageCreateMock
@@ -1062,6 +1094,242 @@ it('creates an internal note', async () => {
   );
 });
 
+it(
+  'queues outbound email after creating a public reply',
+  async () => {
+    const ticketId =
+      'ticket-1';
+
+    const messageId =
+      'message-1';
+
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: ticketId,
+        status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: messageId,
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: messageId,
+        kind: 'PUBLIC_REPLY',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Hello customer.',
+        attachments: [],
+      });
+
+    const result =
+      await service.createMessage(
+        tenant,
+        ticketId,
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Hello customer.',
+        },
+      );
+
+    expect(result.id).toBe(
+      messageId,
+    );
+
+    expect(
+      txEmailDeliveryCreateMock,
+    ).toHaveBeenCalledWith({
+      data: {
+        organizationId:
+          tenant.organizationId,
+        ticketId,
+        messageId,
+        recipientEmail:
+          'customer@example.com',
+        status: 'PENDING',
+        failedAt: null,
+        lastError: null,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    expect(
+      txEmailDeliveryCreateMock,
+    ).toHaveBeenCalledTimes(
+      1,
+    );
+
+    expect(
+      ensureEmailDeliveryQueuedMock,
+    ).toHaveBeenCalledWith(
+      'email-delivery-1',
+    );
+  },
+);
+
+it(
+  'records a failed delivery when the customer has no email address',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+        customer: {
+          email: null,
+        },
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'PUBLIC_REPLY',
+        attachments: [],
+      });
+
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'FAILED',
+      });
+
+    await service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind: 'PUBLIC_REPLY',
+        body: 'Hello customer.',
+      },
+    );
+
+    expect(
+      txEmailDeliveryCreateMock,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientEmail: null,
+        status: 'FAILED',
+        failedAt:
+          expect.any(Date),
+        lastError:
+          'Customer has no email address',
+      }),
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    expect(
+      ensureEmailDeliveryQueuedMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'does not queue email for internal notes',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'INTERNAL_NOTE',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Internal only.',
+        attachments: [],
+      });
+
+    await service.createMessage(
+      tenant,
+      'ticket-1',
+      {
+        kind: 'INTERNAL_NOTE',
+        body: 'Internal only.',
+      },
+    );
+
+    expect(
+      ensureEmailDeliveryQueuedMock,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'keeps the public reply when email enqueueing fails',
+  async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValue({
+        id: 'ticket-1',
+        status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
+      });
+
+    txTicketMessageCreateMock
+      .mockResolvedValue({
+        id: 'message-1',
+      });
+
+    txTicketMessageFindFirstMock
+      .mockResolvedValue({
+        id: 'message-1',
+        kind: 'PUBLIC_REPLY',
+        authorType: 'MEMBER',
+        source: 'MANUAL',
+        body: 'Saved reply.',
+        attachments: [],
+      });
+
+    ensureEmailDeliveryQueuedMock
+      .mockRejectedValue(
+        new Error(
+          'Redis unavailable',
+        ),
+      );
+
+    await expect(
+      service.createMessage(
+        tenant,
+        'ticket-1',
+        {
+          kind: 'PUBLIC_REPLY',
+          body: 'Saved reply.',
+        },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'message-1',
+      }),
+    );
+  },
+);
+
 it('rejects public replies on closed tickets', async () => {
   transactionTicketFindFirstMock
     .mockResolvedValue({
@@ -1156,6 +1424,9 @@ it(
       .mockResolvedValue({
         id: 'ticket-1',
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     txAttachmentFindManyMock

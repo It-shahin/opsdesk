@@ -22,6 +22,7 @@ import request from 'supertest';
 import { AttachmentsController } from '../src/attachments/attachments.controller.js';
 import { AttachmentsService } from '../src/attachments/attachments.service.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { JobsService } from '../src/jobs/jobs.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { ObjectStorageService } from '../src/storage/object-storage.service.js';
@@ -102,6 +103,8 @@ describe('Attachment HTTP security', () => {
   const txAttachmentUpdateManyMock = jest.fn();
   const txMessageCreateMock = jest.fn();
   const txMessageFindFirstMock = jest.fn();
+  const txEmailDeliveryCreateMock = jest.fn();
+  const ensureEmailDeliveryQueuedMock = jest.fn();
 
   const transactionClient = {
     ticket: {
@@ -115,6 +118,9 @@ describe('Attachment HTTP security', () => {
     ticketMessage: {
       create: txMessageCreateMock,
       findFirst: txMessageFindFirstMock,
+    },
+    emailDelivery: {
+      create: txEmailDeliveryCreateMock,
     },
   };
 
@@ -206,6 +212,12 @@ describe('Attachment HTTP security', () => {
         AttachmentsService,
         TicketsService,
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: JobsService,
+          useValue: {
+            ensureEmailDeliveryQueued: ensureEmailDeliveryQueuedMock,
+          },
+        },
         { provide: ObjectStorageService, useValue: storage },
         {
           provide: TenantContextService,
@@ -236,6 +248,11 @@ describe('Attachment HTTP security', () => {
     transactionMock.mockImplementation(async (callback) =>
       callback(transactionClient),
     );
+    txEmailDeliveryCreateMock.mockResolvedValue({
+      id: 'email-delivery-1',
+      status: 'PENDING',
+    });
+    ensureEmailDeliveryQueuedMock.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -470,7 +487,13 @@ describe('Attachment HTTP security', () => {
   });
 
   it('atomically links an uploaded attachment to a message', async () => {
-    txTicketFindFirstMock.mockResolvedValue({ id: TICKET_A, status: 'OPEN' });
+    txTicketFindFirstMock.mockResolvedValue({
+      id: TICKET_A,
+      status: 'OPEN',
+      customer: {
+        email: 'customer@example.com',
+      },
+    });
     txAttachmentFindManyMock.mockResolvedValue([
       { id: ATTACHMENT_A, sizeBytes: 100 },
     ]);
@@ -526,6 +549,38 @@ describe('Attachment HTTP security', () => {
       },
       data: { messageId: MESSAGE_A },
     });
+    expect(ensureEmailDeliveryQueuedMock).toHaveBeenCalledWith(
+      'email-delivery-1',
+    );
+  });
+
+  it('never queues email for internal notes', async () => {
+    txTicketFindFirstMock.mockResolvedValue({
+      id: TICKET_A,
+      status: 'OPEN',
+    });
+    txMessageCreateMock.mockResolvedValue({
+      id: MESSAGE_A,
+    });
+    txMessageFindFirstMock.mockResolvedValue({
+      id: MESSAGE_A,
+      kind: 'INTERNAL_NOTE',
+      authorType: 'MEMBER',
+      source: 'MANUAL',
+      body: 'Internal discussion.',
+      attachments: [],
+    });
+
+    await request(app.getHttpServer())
+      .post(messagesUrl)
+      .set('Authorization', 'Bearer agent-token')
+      .send({
+        kind: 'INTERNAL_NOTE',
+        body: 'Internal discussion.',
+      })
+      .expect(201);
+
+    expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
   });
 
   it('rejects an unavailable or already-linked attachment', async () => {

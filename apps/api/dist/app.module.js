@@ -24,6 +24,8 @@ import { TicketsModule } from './tickets/tickets.module.js';
 import { TagsModule } from './tags/tags.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
+import { InboundEmailModule } from './email/inbound-email.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -50,6 +52,8 @@ AppModule = __decorate([
             TagsModule,
             StorageModule,
             AttachmentsModule,
+            JobsModule,
+            InboundEmailModule,
         ],
         controllers: [AppController],
         providers: [AppService],

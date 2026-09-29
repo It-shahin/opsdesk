@@ -17,6 +17,13 @@ const envSchema = z.object({
   R2_BUCKET: z.string().min(1),
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_SECRET_ACCESS_KEY: z.string().min(1),
+
+  RESEND_API_KEY: z.string().min(1),
+  RESEND_INBOUND_API_KEY: z.string().min(1),
+  RESEND_WEBHOOK_SECRET: z.string().min(1),
+  EMAIL_FROM_NAME: z.string().min(1),
+  EMAIL_FROM_ADDRESS: z.string().email(),
+  EMAIL_INBOUND_DOMAIN: z.string().min(1),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

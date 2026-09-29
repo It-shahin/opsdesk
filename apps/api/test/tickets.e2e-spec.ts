@@ -20,6 +20,9 @@ import {
 import request from 'supertest';
 
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  JobsService,
+} from '../src/jobs/jobs.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { TenantContextService } from '../src/tenancy/tenant-context.service.js';
@@ -159,6 +162,10 @@ describe('Tickets HTTP security', () => {
     jest.fn();
   const txTicketUpdateManyMock =
     jest.fn();
+  const txEmailDeliveryCreateMock =
+    jest.fn();
+  const ensureEmailDeliveryQueuedMock =
+    jest.fn();
 
   const transactionClient = {
     ticket: {
@@ -172,6 +179,10 @@ describe('Tickets HTTP security', () => {
         txTicketMessageCreateMock,
       findFirst:
         txTicketMessageFindFirstMock,
+    },
+    emailDelivery: {
+      create:
+        txEmailDeliveryCreateMock,
     },
   };
 
@@ -326,6 +337,13 @@ describe('Tickets HTTP security', () => {
             useValue: prisma,
           },
           {
+            provide: JobsService,
+            useValue: {
+              ensureEmailDeliveryQueued:
+                ensureEmailDeliveryQueuedMock,
+            },
+          },
+          {
             provide:
               TenantContextService,
             useValue: {
@@ -389,6 +407,17 @@ describe('Tickets HTTP security', () => {
         authorType: 'MEMBER',
         attachments: [],
       });
+
+    txEmailDeliveryCreateMock
+      .mockResolvedValue({
+        id: 'email-delivery-1',
+        status: 'PENDING',
+      });
+
+    ensureEmailDeliveryQueuedMock
+      .mockResolvedValue(
+        undefined,
+      );
   });
 
   afterAll(async () => {
@@ -694,6 +723,9 @@ describe('Tickets HTTP security', () => {
       .mockResolvedValue({
         id: TICKET_A,
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
 
     await request(app.getHttpServer())
@@ -850,6 +882,9 @@ describe('Tickets HTTP security', () => {
       .mockResolvedValue({
         id: TICKET_A,
         status: 'OPEN',
+        customer: {
+          email: 'customer@example.com',
+        },
       });
     txTicketMessageCreateMock
       .mockResolvedValue({
