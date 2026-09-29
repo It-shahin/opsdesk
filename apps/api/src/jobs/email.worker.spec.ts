@@ -27,6 +27,10 @@ import {
   EmailWorker,
 } from './email.worker.js';
 
+import {
+  JobsService,
+} from './jobs.service.js';
+
 import type {
   SendTicketReplyJob,
 } from './jobs.types.js';
@@ -46,7 +50,13 @@ describe(
     const deliveryUpdateManyMock =
       jest.fn();
 
+    const deliveryFindManyMock =
+      jest.fn();
+
     const sendTicketReplyMock =
+      jest.fn();
+
+    const ensureEmailDeliveryQueuedMock =
       jest.fn();
 
     const worker =
@@ -62,6 +72,9 @@ describe(
 
               updateMany:
                 deliveryUpdateManyMock,
+
+              findMany:
+                deliveryFindManyMock,
             },
           } as unknown as PrismaService,
 
@@ -69,6 +82,11 @@ describe(
             sendTicketReply:
               sendTicketReplyMock,
           } as unknown as EmailService,
+
+          jobsService: {
+            ensureEmailDeliveryQueued:
+              ensureEmailDeliveryQueuedMock,
+          } as unknown as JobsService,
 
           logger: {
             log:
@@ -87,6 +105,16 @@ describe(
             ) => Promise<unknown>;
         }
       ).processTicketReply.bind(
+        worker,
+      );
+
+    const processRecovery =
+      (
+        worker as unknown as {
+          processRecovery:
+            () => Promise<unknown>;
+        }
+      ).processRecovery.bind(
         worker,
       );
 
@@ -165,6 +193,14 @@ describe(
           providerMessageId:
             'resend-email-1',
         });
+
+      deliveryFindManyMock
+        .mockResolvedValue([]);
+
+      ensureEmailDeliveryQueuedMock
+        .mockResolvedValue(
+          undefined,
+        );
     });
 
     it(
@@ -327,6 +363,50 @@ describe(
     );
 
     it(
+      'marks the final transient failure as failed',
+      async () => {
+        sendTicketReplyMock
+          .mockRejectedValue(
+            new EmailProviderError(
+              'Temporary failure',
+              true,
+            ),
+          );
+
+        await expect(
+          processTicketReply(
+            createJob(4),
+          ),
+        ).rejects.toBeInstanceOf(
+          EmailProviderError,
+        );
+
+        expect(
+          deliveryUpdateManyMock,
+        ).toHaveBeenLastCalledWith({
+          where: {
+            id:
+              DELIVERY_ID,
+
+            status:
+              'SENDING',
+          },
+
+          data: {
+            status:
+              'FAILED',
+
+            failedAt:
+              expect.any(Date),
+
+            lastError:
+              'EmailProviderError',
+          },
+        });
+      },
+    );
+
+    it(
       'allows only one duplicate job to claim the pending delivery',
       async () => {
         deliveryUpdateManyMock
@@ -347,6 +427,105 @@ describe(
         expect(
           sendTicketReplyMock,
         ).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      'DELIVERED',
+      'BOUNCED',
+      'COMPLAINED',
+      'SUPPRESSED',
+      'FAILED',
+    ])(
+      'skips a stale job when the delivery is already %s',
+      async (
+        status,
+      ) => {
+        deliveryFindUniqueMock
+          .mockResolvedValue({
+            ...delivery,
+            status,
+          });
+
+        await expect(
+          processTicketReply(
+            createJob(),
+          ),
+        ).resolves.toEqual({
+          skipped:
+            true,
+
+          status,
+        });
+
+        expect(
+          deliveryUpdateManyMock,
+        ).not.toHaveBeenCalled();
+
+        expect(
+          sendTicketReplyMock,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it(
+      'recovers stale sending deliveries and reconstructs pending jobs',
+      async () => {
+        const deliveryB =
+          '99999999-9999-4999-8999-999999999999';
+
+        deliveryFindManyMock
+          .mockResolvedValue([
+            {
+              id:
+                DELIVERY_ID,
+            },
+            {
+              id:
+                deliveryB,
+            },
+          ]);
+
+        await expect(
+          processRecovery(),
+        ).resolves.toEqual({
+          recovered:
+            2,
+        });
+
+        expect(
+          deliveryUpdateManyMock,
+        ).toHaveBeenCalledWith({
+          where: {
+            status:
+              'SENDING',
+
+            lastAttemptAt: {
+              lt:
+                expect.any(Date),
+            },
+          },
+
+          data: {
+            status:
+              'PENDING',
+
+            lastError:
+              'Recovered stale sending attempt',
+          },
+        });
+
+        expect(
+          ensureEmailDeliveryQueuedMock,
+        ).toHaveBeenCalledWith(
+          DELIVERY_ID,
+        );
+
+        expect(
+          ensureEmailDeliveryQueuedMock,
+        ).toHaveBeenCalledWith(
+          deliveryB,
+        );
       },
     );
   },

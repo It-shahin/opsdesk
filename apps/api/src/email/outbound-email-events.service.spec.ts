@@ -94,6 +94,9 @@ describe(
           .mockResolvedValue({
             id:
               DELIVERY_ID,
+
+            providerMessageId:
+              null,
           });
 
         const result =
@@ -122,6 +125,35 @@ describe(
               DELIVERY_ID,
           },
         });
+
+        expect(
+          txDeliveryUpdateManyMock,
+        ).toHaveBeenNthCalledWith(
+          1,
+          {
+            where: {
+              id:
+                DELIVERY_ID,
+
+              OR: [
+                {
+                  providerMessageId:
+                    null,
+                },
+
+                {
+                  providerMessageId:
+                    'resend-email-1',
+                },
+              ],
+            },
+
+            data: {
+              providerMessageId:
+                'resend-email-1',
+            },
+          },
+        );
 
         expect(
           txDeliveryUpdateManyMock,
@@ -196,12 +228,103 @@ describe(
 
     it.each([
       [
+        'email.sent',
+        'SENT',
+        [
+          'PENDING',
+          'SENDING',
+          'SENT',
+        ],
+        'sentAt',
+      ],
+      [
+        'email.delivery_delayed',
+        'DELAYED',
+        [
+          'PENDING',
+          'SENDING',
+          'SENT',
+          'DELAYED',
+        ],
+        null,
+      ],
+    ] as const)(
+      'maps %s to %s',
+      async (
+        eventType,
+        expectedStatus,
+        allowedFrom,
+        timestampField,
+      ) => {
+        deliveryFindUniqueMock
+          .mockResolvedValue({
+            id:
+              DELIVERY_ID,
+          });
+
+        await service.handle(
+          eventType,
+          {
+            emailId:
+              'resend-email-progress',
+
+            tags: {
+              opsdesk_delivery_id:
+                DELIVERY_ID,
+            },
+          },
+          {
+            webhookMessageId:
+              'webhook-message-progress',
+          },
+        );
+
+        const data = {
+          status:
+            expectedStatus,
+
+          ...(timestampField
+            ? {
+                [timestampField]:
+                  expect.any(Date),
+              }
+            : {}),
+        };
+
+        expect(
+          txDeliveryUpdateManyMock,
+        ).toHaveBeenLastCalledWith({
+          where: {
+            id:
+              DELIVERY_ID,
+
+            status: {
+              in:
+                allowedFrom,
+            },
+          },
+
+          data,
+        });
+      },
+    );
+
+    it.each([
+      [
         'email.bounced',
         'BOUNCED',
       ],
       [
         'email.complained',
         'COMPLAINED',
+      ],
+      [
+        'email.suppressed',
+        'SUPPRESSED',
+      ],
+      [
+        'email.failed',
+        'FAILED',
       ],
     ] as const)(
       'maps %s to %s without allowing terminal-state regression',
