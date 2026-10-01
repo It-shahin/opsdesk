@@ -7,6 +7,8 @@ const envSchema = z.object({
 
   PORT: z.coerce.number().int().positive().default(3001),
 
+  WEB_ORIGIN: z.string().url().default('http://localhost:3000'),
+
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
 
@@ -25,6 +27,8 @@ const envSchema = z.object({
   EMAIL_FROM_ADDRESS: z.string().email(),
   EMAIL_INBOUND_DOMAIN: z.string().min(1),
 });
+
+
 
 export function validateEnv(config: Record<string, unknown>) {
   const result = envSchema.safeParse(config);

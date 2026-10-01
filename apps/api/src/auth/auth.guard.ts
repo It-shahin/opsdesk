@@ -4,102 +4,128 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Reflector } from '@nestjs/core';
+
 import {
-  createRemoteJWKSet,
-  jwtVerify,
-} from 'jose';
-import type { Request } from 'express';
+  Reflector,
+} from '@nestjs/core';
+
+import type {
+  Request,
+} from 'express';
 
 import type {
   AuthenticatedRequest,
-  AuthPrincipal,
 } from './auth.types.js';
-import { IS_PUBLIC_KEY } from './public.decorator.js';
+
+import {
+  AccessTokenVerifierService,
+} from './access-token-verifier.service.js';
+
+import {
+  IS_PUBLIC_KEY,
+} from './public.decorator.js';
 
 @Injectable()
-export class AuthGuard implements CanActivate {
-  private readonly issuer: string;
-  private readonly audience: string;
-  private readonly jwks: ReturnType<typeof createRemoteJWKSet>;
-
+export class AuthGuard
+  implements CanActivate
+{
   constructor(
-    private readonly configService: ConfigService,
-    private readonly reflector: Reflector,
-  ) {
-    this.issuer =
-      this.configService.getOrThrow<string>('AUTH0_ISSUER_BASE_URL');
+    private readonly reflector:
+      Reflector,
 
-    this.audience =
-      this.configService.getOrThrow<string>('AUTH0_AUDIENCE');
+    private readonly accessTokens:
+      AccessTokenVerifierService,
+  ) {}
 
-    this.jwks = createRemoteJWKSet(
-      new URL('.well-known/jwks.json', this.issuer),
-    );
-  }
+  async canActivate(
+    context:
+      ExecutionContext,
+  ): Promise<boolean> {
+    const isPublic =
+      this.reflector
+        .getAllAndOverride<boolean>(
+          IS_PUBLIC_KEY,
+          [
+            context.getHandler(),
+            context.getClass(),
+          ],
+        );
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(
-      IS_PUBLIC_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    if (
+      isPublic
+    ) {
+      return true;
+    }
 
-    if (isPublic) {
+    /*
+     * WebSocket authentication is
+     * handled at the Socket.IO
+     * handshake boundary.
+     */
+    if (
+      context.getType() !==
+      'http'
+    ) {
       return true;
     }
 
     const request =
-      context.switchToHttp().getRequest<AuthenticatedRequest>();
+      context
+        .switchToHttp()
+        .getRequest<
+          AuthenticatedRequest
+        >();
 
-    const token = this.extractBearerToken(request);
-
-    if (!token) {
-      throw new UnauthorizedException('Missing access token');
-    }
-
-    try {
-      const { payload } = await jwtVerify(
-        token,
-        this.jwks,
-        {
-          issuer: this.issuer,
-          audience: this.audience,
-          algorithms: ['RS256'],
-        },
+    const token =
+      this.extractBearerToken(
+        request,
       );
 
-      if (!payload.sub) {
-        throw new UnauthorizedException(
-          'Access token does not contain a subject',
-        );
-      }
-
-      request.auth = payload as AuthPrincipal;
-      request.accessToken = token;
-
-      return true;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-
-      throw new UnauthorizedException('Invalid access token');
+    if (!token) {
+      throw new UnauthorizedException(
+        'Missing access token',
+      );
     }
+
+    const principal =
+      await this.accessTokens
+        .verify(
+          token,
+        );
+
+    request.auth =
+      principal;
+
+    request.accessToken =
+      token;
+
+    return true;
   }
 
   private extractBearerToken(
-    request: Request,
+    request:
+      Request,
   ): string | undefined {
-    const authorization = request.headers.authorization;
+    const authorization =
+      request.headers
+        .authorization;
 
     if (!authorization) {
       return undefined;
     }
 
-    const [type, token] = authorization.split(' ');
+    const [
+      type,
+      token,
+    ] =
+      authorization.split(
+        ' ',
+      );
 
-    if (type !== 'Bearer' || !token) {
+    if (
+      type !== 'Bearer' ||
+      !token
+    ) {
       return undefined;
     }
 
