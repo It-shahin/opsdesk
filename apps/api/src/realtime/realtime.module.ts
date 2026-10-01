@@ -18,11 +18,21 @@ import {
   RealtimeGateway,
 } from './realtime.gateway.js';
 
+import {
+  RbacModule,
+} from '../rbac/rbac.module.js';
+
+import {
+  TicketsModule,
+} from '../tickets/tickets.module.js';
+
 @Module({
   imports: [
     AuthModule,
     UsersModule,
     TenancyModule,
+    RbacModule,
+    TicketsModule,
   ],
 
   providers: [

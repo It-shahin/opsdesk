@@ -1,5 +1,4 @@
-export const REALTIME_NAMESPACE =
-  '/realtime';
+export const REALTIME_NAMESPACE = '/realtime';
 
 export const REALTIME_EVENTS = {
   READY:
@@ -16,4 +15,16 @@ export const REALTIME_EVENTS = {
 
   ORGANIZATION_LEFT:
     'organization.left',
+
+  TICKET_JOIN:
+    'ticket.join',
+
+  TICKET_JOINED:
+    'ticket.joined',
+
+  TICKET_LEAVE:
+    'ticket.leave',
+
+  TICKET_LEFT:
+    'ticket.left',
 } as const;

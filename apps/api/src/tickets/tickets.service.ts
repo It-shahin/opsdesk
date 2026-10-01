@@ -1463,4 +1463,24 @@ async listMessages(
 
   return messages.reverse();
 }
+
+async existsInOrganization(
+  organizationId: string,
+  ticketId: string,
+): Promise<boolean> {
+  const ticket =
+    await this.prisma.ticket.findFirst({
+      where: {
+        id: ticketId,
+        organizationId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  return ticket !== null;
+}
+
 }

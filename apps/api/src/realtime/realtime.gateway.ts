@@ -39,6 +39,7 @@ import {
 
 import {
   organizationRoom,
+  ticketRoom,
   userRoom,
 } from './realtime.rooms.js';
 
@@ -51,6 +52,22 @@ import {
 import {
   isUUID,
 } from 'class-validator';
+
+import {
+  PermissionsService,
+} from '../rbac/permissions.service.js';
+
+import {
+  PERMISSIONS,
+} from '../rbac/permissions.js';
+
+import {
+  TicketsService,
+} from '../tickets/tickets.service.js';
+
+import type {
+  TicketRoomPayload,
+} from './realtime.types.js';
 
 @WebSocketGateway({
   namespace:
@@ -230,17 +247,18 @@ async leaveOrganization(
     };
   }
 
+  await this.leaveAllOrganizationTickets(
+    client,
+    organizationId,
+  );
+
   await client.leave(
     organizationRoom(
       organizationId,
     ),
   );
 
-  delete client
-    .data
-    .tenants[
-      organizationId
-    ];
+  delete client.data.tenants[organizationId];
 
   client.emit(
     REALTIME_EVENTS
@@ -265,6 +283,12 @@ async leaveOrganization(
 
   private readonly tenantContext:
     TenantContextService,
+
+  private readonly permissions:
+    PermissionsService,
+
+  private readonly ticketsService:
+    TicketsService,
 ) {}
 
   afterInit(
@@ -331,6 +355,9 @@ async leaveOrganization(
             user.id;
 
             client.data.tenants =
+            {};
+
+            client.data.tickets =
             {};
 
           next();
@@ -402,4 +429,397 @@ async leaveOrganization(
 
     return error;
   }
+
+  @SubscribeMessage(
+  REALTIME_EVENTS
+    .TICKET_JOIN,
+)
+async joinTicket(
+  @ConnectedSocket()
+  client:
+    AuthenticatedSocket,
+
+  @MessageBody()
+  payload:
+    TicketRoomPayload,
+) {
+  const organizationId =
+    payload?.organizationId;
+
+  const ticketId =
+    payload?.ticketId;
+
+  if (
+    typeof organizationId !==
+      'string' ||
+    !isUUID(
+      organizationId,
+    )
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'INVALID_ORGANIZATION_ID',
+
+        message:
+          'Invalid organization ID',
+      },
+    };
+  }
+
+  if (
+    typeof ticketId !==
+      'string' ||
+    !isUUID(
+      ticketId,
+    )
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'INVALID_TICKET_ID',
+
+        message:
+          'Invalid ticket ID',
+      },
+    };
+  }
+
+  /*
+   * A ticket room can only be entered
+   * from an organization the socket
+   * has already explicitly joined.
+   */
+  const joinedTenant =
+    client.data.tenants[
+      organizationId
+    ];
+
+  if (!joinedTenant) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'ORGANIZATION_NOT_JOINED',
+
+        message:
+          'Organization is not joined',
+      },
+    };
+  }
+
+  /*
+   * Re-resolve membership instead of
+   * blindly trusting the cached role.
+   *
+   * Membership/role may have changed
+   * while this socket stayed open.
+   */
+  const tenant =
+    await this.tenantContext
+      .resolve(
+        client.data.userId,
+        organizationId,
+      );
+
+  if (!tenant) {
+    /*
+     * Membership was removed while
+     * the socket remained connected.
+     */
+    await this.leaveAllOrganizationTickets(
+      client,
+      organizationId,
+    );
+
+    await client.leave(
+      organizationRoom(
+        organizationId,
+      ),
+    );
+
+    delete client
+      .data
+      .tenants[
+        organizationId
+      ];
+
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'ORGANIZATION_NOT_FOUND',
+
+        message:
+          'Organization not found',
+      },
+    };
+  }
+
+  /*
+   * Refresh cached tenant context so
+   * role changes are reflected.
+   */
+  client.data.tenants[
+    organizationId
+  ] =
+    tenant;
+
+  const canReadTickets =
+    this.permissions
+      .hasPermission(
+        tenant.role,
+        PERMISSIONS
+          .TICKETS_READ,
+      );
+
+  if (
+    !canReadTickets
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'TICKET_ACCESS_DENIED',
+
+        message:
+          'Ticket access denied',
+      },
+    };
+  }
+
+  const exists =
+    await this.ticketsService
+      .existsInOrganization(
+        tenant.organizationId,
+        ticketId,
+      );
+
+  if (!exists) {
+    /*
+     * Same response whether:
+     *
+     * - ticket doesn't exist
+     * - ticket belongs to another org
+     *
+     * Prevents cross-tenant
+     * enumeration.
+     */
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'TICKET_NOT_FOUND',
+
+        message:
+          'Ticket not found',
+      },
+    };
+  }
+
+  await client.join(
+    ticketRoom(
+      tenant.organizationId,
+      ticketId,
+    ),
+  );
+
+  client.data.tickets[
+    ticketId
+  ] = {
+    organizationId:
+      tenant.organizationId,
+
+    ticketId,
+  };
+
+  const ticket = {
+    organizationId:
+      tenant.organizationId,
+
+    ticketId,
+  };
+
+  client.emit(
+    REALTIME_EVENTS
+      .TICKET_JOINED,
+    ticket,
+  );
+
+  return {
+    ok:
+      true,
+
+    ticket,
+  };
+}
+
+@SubscribeMessage(
+  REALTIME_EVENTS
+    .TICKET_LEAVE,
+)
+async leaveTicket(
+  @ConnectedSocket()
+  client:
+    AuthenticatedSocket,
+
+  @MessageBody()
+  payload:
+    TicketRoomPayload,
+) {
+  const organizationId =
+    payload?.organizationId;
+
+  const ticketId =
+    payload?.ticketId;
+
+  if (
+    typeof organizationId !==
+      'string' ||
+    !isUUID(
+      organizationId,
+    )
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'INVALID_ORGANIZATION_ID',
+
+        message:
+          'Invalid organization ID',
+      },
+    };
+  }
+
+  if (
+    typeof ticketId !==
+      'string' ||
+    !isUUID(
+      ticketId,
+    )
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'INVALID_TICKET_ID',
+
+        message:
+          'Invalid ticket ID',
+      },
+    };
+  }
+
+  const joinedTicket =
+    client.data.tickets[
+      ticketId
+    ];
+
+  if (
+    !joinedTicket ||
+    joinedTicket
+      .organizationId !==
+      organizationId
+  ) {
+    return {
+      ok:
+        false,
+
+      error: {
+        code:
+          'TICKET_NOT_JOINED',
+
+        message:
+          'Ticket is not joined',
+      },
+    };
+  }
+
+  await client.leave(
+    ticketRoom(
+      organizationId,
+      ticketId,
+    ),
+  );
+
+  delete client
+    .data
+    .tickets[
+      ticketId
+    ];
+
+  const ticket = {
+    organizationId,
+    ticketId,
+  };
+
+  client.emit(
+    REALTIME_EVENTS
+      .TICKET_LEFT,
+    ticket,
+  );
+
+  return {
+    ok:
+      true,
+  };
+}
+
+private async leaveAllOrganizationTickets(
+  client:
+    AuthenticatedSocket,
+
+  organizationId:
+    string,
+) {
+  const joinedTickets =
+    Object.values(
+      client.data.tickets,
+    );
+
+  for (
+    const ticket
+    of joinedTickets
+  ) {
+    if (
+      ticket.organizationId !==
+        organizationId
+    ) {
+      continue;
+    }
+
+    await client.leave(
+      ticketRoom(
+        ticket.organizationId,
+        ticket.ticketId,
+      ),
+    );
+
+    delete client
+      .data
+      .tickets[
+        ticket.ticketId
+      ];
+  }
+}
+
 }

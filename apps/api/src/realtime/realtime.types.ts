@@ -32,6 +32,16 @@ export interface ServerToClientEvents {
         string;
     },
   ) => void;
+
+  'ticket.joined': (
+    payload:
+      TicketJoinedPayload,
+  ) => void;
+
+  'ticket.left': (
+    payload:
+      TicketJoinedPayload,
+  ) => void;
 }
 
 export interface ClientToServerEvents {
@@ -50,6 +60,22 @@ export interface ClientToServerEvents {
     ack:
       OrganizationLeaveAck,
   ) => void;
+
+  'ticket.join': (
+    payload:
+      TicketRoomPayload,
+
+    ack:
+      TicketJoinAck,
+  ) => void;
+
+  'ticket.leave': (
+    payload:
+      TicketRoomPayload,
+
+    ack:
+      TicketLeaveAck,
+  ) => void;
 }
 
 export interface InterServerEvents {}
@@ -65,6 +91,12 @@ export interface RealtimeSocketData {
     Record<
       string,
       TenantContext
+    >;
+
+  tickets:
+    Record<
+      string,
+      JoinedTicketContext
     >;
 }
 
@@ -120,6 +152,65 @@ export type OrganizationJoinAck =
   ) => void;
 
 export type OrganizationLeaveAck =
+  (
+    result:
+      | {
+          ok:
+            true;
+        }
+      | {
+          ok:
+            false;
+
+          error:
+            RealtimeError;
+        },
+  ) => void;
+
+  export interface JoinedTicketContext {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+}
+
+export interface TicketRoomPayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+}
+
+export interface TicketJoinedPayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+}
+
+export type TicketJoinAck =
+  (
+    result:
+      | {
+          ok:
+            true;
+
+          ticket:
+            TicketJoinedPayload;
+        }
+      | {
+          ok:
+            false;
+
+          error:
+            RealtimeError;
+        },
+  ) => void;
+
+export type TicketLeaveAck =
   (
     result:
       | {

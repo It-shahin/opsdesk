@@ -9,3 +9,13 @@ export function organizationRoom(
 ): string {
   return `organization:${organizationId}`;
 }
+
+export function ticketRoom(
+  organizationId: string,
+  ticketId: string,
+): string {
+  return (
+    `ticket:${organizationId}:` +
+    ticketId
+  );
+}

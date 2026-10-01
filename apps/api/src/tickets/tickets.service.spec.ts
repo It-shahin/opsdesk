@@ -249,6 +249,26 @@ describe('TicketsService', () => {
       );
   });
 
+  describe('existsInOrganization', () => {
+    const ORG_A = '11111111-1111-4111-8111-111111111111';
+    const TICKET_A = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    it.each([
+      { description: 'found', record: { id: TICKET_A }, expected: true },
+      { description: 'not found', record: null, expected: false },
+    ])('returns $expected when the ticket is $description within the organization', async ({ record, expected }) => {
+      ticketFindFirstMock.mockResolvedValue(record);
+
+      await expect(service.existsInOrganization(ORG_A, TICKET_A)).resolves.toBe(expected);
+
+      expect(ticketFindFirstMock).toHaveBeenCalledTimes(1);
+      expect(ticketFindFirstMock).toHaveBeenCalledWith({
+        where: { id: TICKET_A, organizationId: ORG_A },
+        select: { id: true },
+      });
+    });
+  });
+
   it('creates a ticket for an active customer inside the tenant', async () => {
     customerFindFirstMock
       .mockResolvedValue({
