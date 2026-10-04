@@ -23,6 +23,8 @@ import { AttachmentsController } from '../src/attachments/attachments.controller
 import { AttachmentsService } from '../src/attachments/attachments.service.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { JobsService } from '../src/jobs/jobs.service.js';
+import { RealtimePublisherModule } from '../src/realtime/realtime-publisher.module.js';
+import { RedisService } from '../src/redis/redis.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { ObjectStorageService } from '../src/storage/object-storage.service.js';
@@ -203,6 +205,7 @@ describe('Attachment HTTP security', () => {
     };
 
     const moduleRef = await Test.createTestingModule({
+      imports: [RealtimePublisherModule],
       controllers: [AttachmentsController, TicketsController],
       providers: [
         Reflector,
@@ -228,7 +231,10 @@ describe('Attachment HTTP security', () => {
           useValue: { syncAuthenticatedUser: syncUserMock },
         },
       ],
-    }).compile();
+    })
+      .overrideProvider(RedisService)
+      .useValue({ getClient: () => ({ publish: async () => 0 }) })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalGuards(new TestAuthGuard());

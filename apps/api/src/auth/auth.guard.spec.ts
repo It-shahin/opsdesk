@@ -2,7 +2,6 @@ import {
   UnauthorizedException,
   type ExecutionContext,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import {
   beforeEach,
@@ -13,24 +12,17 @@ import {
 } from '@jest/globals';
 
 import { AuthGuard } from './auth.guard.js';
+import type { AccessTokenVerifierService } from './access-token-verifier.service.js';
 
 describe('AuthGuard', () => {
   let guard: AuthGuard;
 
   const getAllAndOverride = jest.fn<() => boolean | undefined>();
 
-  const configService = {
-    getOrThrow: jest.fn<(key: string) => string>((key: string) => {
-      if (key === 'AUTH0_ISSUER_BASE_URL') {
-        return 'https://example.auth0.com/';
-      }
+  const verifyMock = jest.fn<AccessTokenVerifierService['verify']>();
 
-      if (key === 'AUTH0_AUDIENCE') {
-        return 'https://api.opsdesk.dev';
-      }
-
-      throw new Error(`Unknown config key: ${key}`);
-    }),
+  const accessTokens = {
+    verify: verifyMock,
   };
 
   const reflector = {
@@ -38,11 +30,11 @@ describe('AuthGuard', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
 
     guard = new AuthGuard(
-      configService as unknown as ConfigService,
       reflector as unknown as Reflector,
+      accessTokens as unknown as AccessTokenVerifierService,
     );
   });
 
@@ -52,6 +44,7 @@ describe('AuthGuard', () => {
     return {
       getHandler: jest.fn(),
       getClass: jest.fn(),
+      getType: () => 'http',
 
       switchToHttp: () => ({
         getRequest: () => ({
@@ -71,6 +64,20 @@ describe('AuthGuard', () => {
     );
 
     expect(result).toBe(true);
+    expect(verifyMock).not.toHaveBeenCalled();
+  });
+
+  it('does not apply HTTP authentication to websocket contexts', async () => {
+    getAllAndOverride.mockReturnValue(false);
+
+    const context = {
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
+      getType: () => 'ws',
+    } as unknown as ExecutionContext;
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(verifyMock).not.toHaveBeenCalled();
   });
 
   it('rejects requests without an access token', async () => {
@@ -87,6 +94,9 @@ describe('AuthGuard', () => {
 
   it('rejects malformed bearer tokens', async () => {
     getAllAndOverride.mockReturnValue(false);
+    verifyMock.mockRejectedValue(
+      new UnauthorizedException('Invalid access token'),
+    );
 
     await expect(
       guard.canActivate(
@@ -97,6 +107,7 @@ describe('AuthGuard', () => {
         'Invalid access token',
       ),
     );
+    expect(verifyMock).toHaveBeenCalledWith('not-a-valid-jwt');
   });
 
   it('rejects non-Bearer authorization schemes', async () => {

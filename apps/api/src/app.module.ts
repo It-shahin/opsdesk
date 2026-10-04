@@ -20,7 +20,8 @@ import { TagsModule } from './tags/tags.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
-import { InboundEmailModule } from './email/inbound-email.module.js'
+import { InboundEmailModule } from './email/inbound-email.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 
 @Module({
   imports: [
@@ -32,7 +33,6 @@ import { InboundEmailModule } from './email/inbound-email.module.js'
 
   DatabaseModule,
   RedisModule,
-  AuthModule,
   AuthModule,
   UsersModule,
   OrganizationsModule,
@@ -48,6 +48,7 @@ import { InboundEmailModule } from './email/inbound-email.module.js'
   AttachmentsModule,
   JobsModule,
   InboundEmailModule,
+  RealtimeModule
 ],
   controllers: [AppController],
   providers: [AppService],

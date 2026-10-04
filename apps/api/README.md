@@ -57,6 +57,25 @@ $ pnpm run test:e2e
 $ pnpm run test:cov
 ```
 
+### Realtime E2E tests
+
+`test/realtime.e2e-spec.ts` uses real Socket.IO clients, the Redis emitter, and
+the Redis adapter. Identity, membership, permissions, and ticket lookups are
+mocked; no Auth0 calls or database writes are needed. Redis must be running at
+`REDIS_URL`, which defaults to `redis://127.0.0.1:6379`. This suite ignores `.env`
+files, so set `REDIS_URL` in the process environment to use another instance.
+
+From the repository root, run:
+
+```bash
+pnpm --filter api test:e2e --testPathPatterns=realtime.e2e-spec.ts
+```
+
+Membership revocation removes organization and child ticket rooms when the socket
+next revalidates membership, such as through `ticket.join`. An idle socket is not
+automatically evicted when membership changes in PostgreSQL. The suite verifies
+this revalidation boundary rather than instantaneous revocation.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

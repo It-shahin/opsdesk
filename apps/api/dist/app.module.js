@@ -26,6 +26,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { InboundEmailModule } from './email/inbound-email.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -38,7 +39,6 @@ AppModule = __decorate([
             }),
             DatabaseModule,
             RedisModule,
-            AuthModule,
             AuthModule,
             UsersModule,
             OrganizationsModule,
@@ -54,6 +54,7 @@ AppModule = __decorate([
             AttachmentsModule,
             JobsModule,
             InboundEmailModule,
+            RealtimeModule
         ],
         controllers: [AppController],
         providers: [AppService],

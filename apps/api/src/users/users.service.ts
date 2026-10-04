@@ -8,6 +8,10 @@ import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { Auth0UserInfoService } from '../auth/auth0-userinfo.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 
+import type {
+  AuthenticatedSession,
+} from '../auth/auth.types.js';
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -15,11 +19,16 @@ export class UsersService {
     private readonly auth0UserInfo: Auth0UserInfoService,
   ) {}
 
-  async syncAuthenticatedUser(request: AuthenticatedRequest) {
-    const profile = await this.auth0UserInfo.getUserProfile(
-      request.accessToken,
-      request.auth.sub,
-    );
+  async syncAuthenticatedUser(
+  session:
+    AuthenticatedSession,
+) {
+  const profile =
+    await this.auth0UserInfo
+      .getUserProfile(
+        session.accessToken,
+        session.auth.sub,
+      );
 
     if (!profile.emailVerified) {
       throw new ForbiddenException(

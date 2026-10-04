@@ -20,6 +20,10 @@ import {
   JobsModule,
 } from './jobs/jobs.module.js';
 
+import {
+  RealtimePublisherModule,
+} from './realtime/realtime-publisher.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,6 +38,8 @@ import {
     EmailModule,
 
     JobsModule,
+
+    RealtimePublisherModule,
   ],
 
   providers: [EmailWorker],
