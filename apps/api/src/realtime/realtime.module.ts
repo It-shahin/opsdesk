@@ -26,6 +26,10 @@ import {
   TicketsModule,
 } from '../tickets/tickets.module.js';
 
+import {
+  RealtimePublisherModule,
+} from './realtime-publisher.module.js';
+
 @Module({
   imports: [
     AuthModule,
@@ -33,6 +37,7 @@ import {
     TenancyModule,
     RbacModule,
     TicketsModule,
+    RealtimePublisherModule
   ],
 
   providers: [

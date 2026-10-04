@@ -27,4 +27,16 @@ export const REALTIME_EVENTS = {
 
   TICKET_LEFT:
     'ticket.left',
+
+  TICKET_CREATED:
+    'ticket.created',
+
+  TICKET_UPDATED:
+    'ticket.updated',
+
+  TICKET_MESSAGE_CREATED:
+    'ticket.message.created',
+
+  EMAIL_DELIVERY_UPDATED:
+    'email.delivery.updated',
 } as const;

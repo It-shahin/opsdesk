@@ -1,0 +1,18 @@
+import {
+  Module,
+} from '@nestjs/common';
+
+import {
+  RealtimeService,
+} from './realtime.service.js';
+
+@Module({
+  providers: [
+    RealtimeService,
+  ],
+
+  exports: [
+    RealtimeService,
+  ],
+})
+export class RealtimePublisherModule {}

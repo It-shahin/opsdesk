@@ -1,4 +1,5 @@
 import type {
+  Namespace,
   Socket,
 } from 'socket.io';
 
@@ -9,6 +10,10 @@ import type {
 import type {
   TenantContext,
 } from '../tenancy/tenant-context.types.js';
+
+import type {
+  EmailDeliveryStatus,
+} from '../generated/prisma/enums.js';
 
 export interface RealtimeReadyPayload {
   connectedAt:
@@ -41,6 +46,26 @@ export interface ServerToClientEvents {
   'ticket.left': (
     payload:
       TicketJoinedPayload,
+  ) => void;
+
+  'ticket.created': (
+    payload:
+      TicketCreatedRealtimePayload,
+  ) => void;
+
+  'ticket.updated': (
+    payload:
+      TicketUpdatedRealtimePayload,
+  ) => void;
+
+  'ticket.message.created': (
+    payload:
+      TicketMessageCreatedRealtimePayload,
+  ) => void;
+
+  'email.delivery.updated': (
+    payload:
+      EmailDeliveryUpdatedRealtimePayload,
   ) => void;
 }
 
@@ -79,6 +104,14 @@ export interface ClientToServerEvents {
 }
 
 export interface InterServerEvents {}
+
+export type RealtimeNamespace =
+  Namespace<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    InterServerEvents,
+    RealtimeSocketData
+  >;
 
 export interface RealtimeSocketData {
   auth:
@@ -225,3 +258,59 @@ export type TicketLeaveAck =
             RealtimeError;
         },
   ) => void;
+
+  export interface TicketCreatedRealtimePayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+
+  occurredAt:
+    string;
+}
+
+export interface TicketUpdatedRealtimePayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+
+  occurredAt:
+    string;
+}
+
+export interface TicketMessageCreatedRealtimePayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+
+  messageId:
+    string;
+
+  occurredAt:
+    string;
+}
+
+export interface EmailDeliveryUpdatedRealtimePayload {
+  organizationId:
+    string;
+
+  ticketId:
+    string;
+
+  messageId:
+    string;
+
+  emailDeliveryId:
+    string;
+
+  status:
+    EmailDeliveryStatus;
+
+  occurredAt:
+    string;
+}

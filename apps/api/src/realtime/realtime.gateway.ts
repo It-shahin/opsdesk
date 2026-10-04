@@ -7,7 +7,6 @@ import {
   OnGatewayDisconnect,
   OnGatewayInit,
   WebSocketGateway,
-  WebSocketServer,
 } from '@nestjs/websockets';
 
 import type {
@@ -69,6 +68,14 @@ import type {
   TicketRoomPayload,
 } from './realtime.types.js';
 
+import {
+  RealtimeService,
+} from './realtime.service.js';
+
+import type {
+  RealtimeNamespace,
+} from './realtime.types.js';
+
 @WebSocketGateway({
   namespace:
     REALTIME_NAMESPACE,
@@ -84,9 +91,6 @@ export class RealtimeGateway
       RealtimeGateway.name,
     );
 
-  @WebSocketServer()
-  private namespace!:
-    Namespace;
 
   @SubscribeMessage(
   REALTIME_EVENTS
@@ -289,11 +293,21 @@ async leaveOrganization(
 
   private readonly ticketsService:
     TicketsService,
+
+  private readonly realtime:
+    RealtimeService,
 ) {}
 
   afterInit(
-  namespace: Namespace,
+  namespace:
+    Namespace,
 ) {
+  this.realtime
+    .bindNamespace(
+      namespace as
+        RealtimeNamespace,
+    );
+
   this.logger.log(
     `Realtime namespace initialized: ${REALTIME_NAMESPACE}`,
   );
