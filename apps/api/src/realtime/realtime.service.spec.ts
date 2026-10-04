@@ -301,6 +301,30 @@ describe(
       },
     );
 
+    it.each([
+      'publishTicketCreated',
+      'publishTicketUpdated',
+      'publishMessageCreated',
+      'publishEmailDeliveryUpdated',
+    ] as const)(
+      'returns false when %s emission fails',
+      (publisher) => {
+        emitMock.mockImplementation(() => {
+          throw new Error('Socket adapter unavailable');
+        });
+
+        expect(service[publisher]({
+          organizationId: ORG_A,
+          ticketId: TICKET_A,
+          messageId: MESSAGE_A,
+          emailDeliveryId: DELIVERY_A,
+          status: 'DELIVERED',
+        })).toBe(false);
+
+        expect(emitMock).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it(
       'safely skips events before the namespace is initialized',
       () => {

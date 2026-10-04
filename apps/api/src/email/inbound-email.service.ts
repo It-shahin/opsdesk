@@ -20,6 +20,10 @@ import {
   normalizeEmailAddress,
 } from './inbound-email-routing.js';
 
+import {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
 interface EmailReceivedEvent {
   emailId:
     string;
@@ -138,6 +142,9 @@ export class InboundEmailService {
 
     private readonly provider:
       InboundEmailProviderService,
+
+    private readonly realtime:
+    RealtimeService,
 
     config:
       ConfigService,
@@ -304,7 +311,10 @@ export class InboundEmailService {
     }
 
     try {
-      const message =
+      const {
+        message,
+        ticketReopened,
+      } =
         await this.prisma
           .$transaction(
             async (
@@ -383,9 +393,10 @@ export class InboundEmailService {
                * this ticket requires
                * agent attention again.
                */
-              await transaction
-                .ticket
-                .updateMany({
+              const reopened =
+                await transaction
+                  .ticket
+                  .updateMany({
                   where: {
                     id:
                       ticket.id,
@@ -414,9 +425,39 @@ export class InboundEmailService {
                   },
                 });
 
-              return created;
+              return {
+                message:
+                  created,
+
+                ticketReopened:
+                  reopened.count ===
+                  1,
+              };
             },
           );
+
+      this.realtime
+        .publishMessageCreated({
+          organizationId:
+            ticket.organizationId,
+
+          ticketId:
+            ticket.id,
+
+          messageId:
+            message.id,
+        });
+
+      if (ticketReopened) {
+        this.realtime
+          .publishTicketUpdated({
+            organizationId:
+              ticket.organizationId,
+
+            ticketId:
+              ticket.id,
+          });
+      }
 
       this.logger.log(
         `Created inbound customer message ${message.id} for ticket ${ticket.id}`,

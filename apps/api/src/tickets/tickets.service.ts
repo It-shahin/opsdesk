@@ -28,6 +28,10 @@ import {
   MAX_MESSAGE_ATTACHMENTS_BYTES,
 } from '../attachments/attachment-policy.js';
 
+import {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
 export type CreateTicketInput = {
   customerId: string;
   subject: string;
@@ -54,6 +58,9 @@ export class TicketsService {
 
     private readonly jobsService:
       JobsService,
+
+    private readonly realtime:
+    RealtimeService,
   ) {}
 
   async create(
@@ -83,7 +90,8 @@ export class TicketsService {
       );
     }
 
-    return this.prisma.ticket.create({
+    const ticket =
+      await this.prisma.ticket.create({
       data: {
         organizationId:
           tenant.organizationId,
@@ -125,6 +133,17 @@ export class TicketsService {
         },
       },
     });
+
+    this.realtime
+      .publishTicketCreated({
+        organizationId:
+          tenant.organizationId,
+
+        ticketId:
+          ticket.id,
+      });
+
+    return ticket;
   }
 
   async list(
@@ -489,7 +508,8 @@ async update(
     );
   }
 
-  return this.prisma.ticket.update({
+  const result =
+    await this.prisma.ticket.update({
     where: {
       id: ticket.id,
     },
@@ -539,6 +559,17 @@ async update(
       },
     },
   });
+
+  this.realtime
+    .publishTicketUpdated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        result.id,
+    });
+
+  return result;
 }
 
 private isStatusTransitionAllowed(
@@ -579,7 +610,8 @@ async updateStatus(
   ticketId: string,
   nextStatus: TicketStatus,
 ) {
-  return this.prisma.$transaction(
+  const result =
+    await this.prisma.$transaction(
     async (transaction) => {
       const ticket =
         await transaction.ticket.findFirst({
@@ -703,6 +735,17 @@ async updateStatus(
       return result;
     },
   );
+
+  this.realtime
+    .publishTicketUpdated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        result.id,
+    });
+
+  return result;
 }
 
 private getLifecycleTimestamps(
@@ -797,7 +840,8 @@ async assign(
   }
 
   if (membershipId === null) {
-    return this.prisma.ticket.update({
+    const result =
+      await this.prisma.ticket.update({
       where: {
         id: ticket.id,
       },
@@ -810,6 +854,17 @@ async assign(
       select:
         this.assignmentSelect(),
     });
+
+    this.realtime
+      .publishTicketUpdated({
+        organizationId:
+          tenant.organizationId,
+
+        ticketId:
+          result.id,
+      });
+
+    return result;
   }
 
   const membership =
@@ -850,7 +905,8 @@ async assign(
     );
   }
 
-  return this.prisma.ticket.update({
+  const result =
+    await this.prisma.ticket.update({
     where: {
       id: ticket.id,
     },
@@ -863,6 +919,17 @@ async assign(
     select:
       this.assignmentSelect(),
   });
+
+  this.realtime
+    .publishTicketUpdated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        result.id,
+    });
+
+  return result;
 }
 
 async addTag(
@@ -930,10 +997,22 @@ async addTag(
     },
   });
 
-  return this.findOne(
-    tenant.organizationId,
-    ticket.id,
-  );
+  const result =
+    await this.findOne(
+      tenant.organizationId,
+      ticket.id,
+    );
+
+  this.realtime
+    .publishTicketUpdated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        ticket.id,
+    });
+
+  return result;
 }
 
 async removeTag(
@@ -989,10 +1068,22 @@ async removeTag(
     },
   });
 
-  return this.findOne(
-    tenant.organizationId,
-    ticket.id,
-  );
+  const result =
+    await this.findOne(
+      tenant.organizationId,
+      ticket.id,
+    );
+
+  this.realtime
+    .publishTicketUpdated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId:
+        ticket.id,
+    });
+
+  return result;
 }
 
 private mapTicket<
@@ -1390,6 +1481,36 @@ async createMessage(
       };
       },
     );
+
+  this.realtime
+    .publishMessageCreated({
+      organizationId:
+        tenant.organizationId,
+
+      ticketId,
+
+      messageId:
+        message.id,
+    });
+
+  if (emailDelivery) {
+    this.realtime
+      .publishEmailDeliveryUpdated({
+        organizationId:
+          tenant.organizationId,
+
+        ticketId,
+
+        messageId:
+          message.id,
+
+        emailDeliveryId:
+          emailDelivery.id,
+
+        status:
+          emailDelivery.status,
+      });
+  }
 
   if (
     emailDelivery?.status ===

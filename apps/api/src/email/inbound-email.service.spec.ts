@@ -22,6 +22,10 @@ import {
   InboundEmailService,
 } from './inbound-email.service.js';
 
+import type {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
 const TICKET_ID =
   '819f42f7-5181-4eb7-9f33-256c89ff6f4c';
 
@@ -42,6 +46,17 @@ describe(
 
     const txTicketUpdateManyMock =
       jest.fn();
+
+    const publishMessageCreatedMock =
+      jest.fn<RealtimeService['publishMessageCreated']>();
+
+    const publishTicketUpdatedMock =
+      jest.fn<RealtimeService['publishTicketUpdated']>();
+
+    const realtime = {
+      publishMessageCreated: publishMessageCreatedMock,
+      publishTicketUpdated: publishTicketUpdatedMock,
+    };
 
     const webhookEventFindFirstMock =
       jest.fn();
@@ -156,13 +171,37 @@ describe(
         new InboundEmailService(
           prisma as unknown as PrismaService,
           provider as unknown as InboundEmailProviderService,
+          realtime as unknown as RealtimeService,
           config as unknown as ConfigService,
         );
     });
 
-    it(
-      'creates exactly one message for a verified inbound email',
-      async () => {
+    it.each([
+      { ticketStatus: 'PENDING', reopenedCount: 1 },
+      { ticketStatus: 'RESOLVED', reopenedCount: 1 },
+      { ticketStatus: 'CLOSED', reopenedCount: 1 },
+      { ticketStatus: 'OPEN', reopenedCount: 0 },
+      { ticketStatus: 'PENDING', reopenedCount: 0 },
+    ])(
+      'creates one message for a $ticketStatus ticket with reopen count $reopenedCount',
+      async ({ ticketStatus, reopenedCount }) => {
+        const order: string[] = [];
+        transactionMock.mockImplementationOnce(async (callback) => {
+          const result = await callback(transactionClient);
+          expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+          expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+          order.push('commit');
+          return result;
+        });
+        publishMessageCreatedMock.mockImplementation(() => {
+          order.push('message');
+          return false;
+        });
+        publishTicketUpdatedMock.mockImplementation(() => {
+          order.push('ticket');
+          return false;
+        });
+
         getReceivedEmailMock
           .mockResolvedValue({
             from:
@@ -188,7 +227,7 @@ describe(
               ORG_ID,
 
             status:
-              'PENDING',
+              ticketStatus,
 
             customer: {
               email:
@@ -213,7 +252,7 @@ describe(
 
         txTicketUpdateManyMock
           .mockResolvedValue({
-            count: 1,
+            count: reopenedCount,
           });
 
         const result =
@@ -344,8 +383,61 @@ describe(
           messageId:
             'message-1',
         });
+        expect(txMessageCreateMock).toHaveBeenCalledTimes(1);
+        expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
+        expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+          organizationId: ORG_ID,
+          ticketId: TICKET_ID,
+          messageId: 'message-1',
+        });
+        if (reopenedCount === 1) {
+          expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+          expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+            organizationId: ORG_ID,
+            ticketId: TICKET_ID,
+          });
+          expect(order).toEqual(['commit', 'message', 'ticket']);
+        } else {
+          expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+          expect(order).toEqual(['commit', 'message']);
+        }
       },
     );
+
+    it('does not publish inbound events if the transaction fails to commit', async () => {
+      const recipients = [`ticket-${TICKET_ID}@abc.resend.app`];
+      getReceivedEmailMock.mockResolvedValue({
+        from: 'jane@example.com',
+        to: recipients,
+        text: 'Customer reply.',
+      });
+      ticketFindFirstMock.mockResolvedValue({
+        id: TICKET_ID,
+        organizationId: ORG_ID,
+        status: 'RESOLVED',
+        customer: { email: 'jane@example.com' },
+      });
+      txMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+      txTicketUpdateManyMock.mockResolvedValue({ count: 1 });
+      const error = new Error('Commit failed');
+      transactionMock.mockImplementationOnce(async (callback) => {
+        await callback(transactionClient);
+        throw error;
+      });
+
+      await expect(service.handleReceivedEmail({
+        emailId: 'received-email-1',
+        from: 'jane@example.com',
+        to: recipients,
+      }, {
+        webhookMessageId: 'webhook-message-1',
+        providerEntityId: 'received-email-1',
+        eventType: 'email.received',
+      })).rejects.toBe(error);
+
+      expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+      expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+    });
 
     it(
       'ignores an already processed inbound email',
@@ -392,6 +484,9 @@ describe(
         expect(
           getReceivedEmailMock,
         ).not.toHaveBeenCalled();
+
+        expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+        expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
 
         expect(
           txMessageCreateMock,
@@ -477,6 +572,9 @@ describe(
         expect(
           transactionMock,
         ).not.toHaveBeenCalled();
+
+        expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+        expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
       },
     );
 
@@ -561,6 +659,9 @@ describe(
         expect(
           txTicketUpdateManyMock,
         ).not.toHaveBeenCalled();
+
+        expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+        expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
       },
     );
   },

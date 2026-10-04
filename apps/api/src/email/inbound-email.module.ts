@@ -34,7 +34,15 @@ import {
   OutboundEmailEventsService,
 } from './outbound-email-events.service.js';
 
+import {
+  RealtimePublisherModule,
+} from '../realtime/realtime-publisher.module.js';
+
 @Module({
+  imports: [
+    RealtimePublisherModule,
+  ],
+  
   controllers: [
     ResendWebhookController,
   ],

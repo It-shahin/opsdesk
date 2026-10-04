@@ -21,6 +21,7 @@ import {
   JobsService,
 } from '../jobs/jobs.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
+import type { RealtimeService } from '../realtime/realtime.service.js';
 import { TicketsService } from './tickets.service.js';
 
 describe('TicketsService', () => {
@@ -31,6 +32,25 @@ describe('TicketsService', () => {
 
   const ticketCreateMock =
     jest.fn();
+
+  const publishTicketCreatedMock =
+    jest.fn<RealtimeService['publishTicketCreated']>();
+
+  const publishTicketUpdatedMock =
+    jest.fn<RealtimeService['publishTicketUpdated']>();
+
+  const publishMessageCreatedMock =
+    jest.fn<RealtimeService['publishMessageCreated']>();
+
+  const publishEmailDeliveryUpdatedMock =
+    jest.fn<RealtimeService['publishEmailDeliveryUpdated']>();
+
+  const realtime = {
+    publishTicketCreated: publishTicketCreatedMock,
+    publishTicketUpdated: publishTicketUpdatedMock,
+    publishMessageCreated: publishMessageCreatedMock,
+    publishEmailDeliveryUpdated: publishEmailDeliveryUpdatedMock,
+  };
 
   const ticketFindManyMock =
     jest.fn();
@@ -246,6 +266,7 @@ describe('TicketsService', () => {
           ensureEmailDeliveryQueued:
             ensureEmailDeliveryQueuedMock,
         } as unknown as JobsService,
+        realtime as unknown as RealtimeService,
       );
   });
 
@@ -368,9 +389,46 @@ describe('TicketsService', () => {
       }),
     );
 
-    expect(result).toEqual(
+    expect(publishTicketCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketCreatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: ticket.id,
+    });
+
+    expect(result).toBe(
       ticket,
     );
+  });
+
+  it('does not publish ticket creation when persistence fails', async () => {
+    customerFindFirstMock.mockResolvedValue({ id: customerId });
+    const error = new Error('Database unavailable');
+    ticketCreateMock.mockRejectedValue(error);
+
+    await expect(service.create(tenant, {
+      customerId,
+      subject: 'General question',
+    })).rejects.toBe(error);
+
+    expect(publishTicketCreatedMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the persisted ticket when realtime publishing is skipped', async () => {
+    customerFindFirstMock.mockResolvedValue({ id: customerId });
+    const ticket = { id: 'ticket-1' };
+    ticketCreateMock.mockResolvedValue(ticket);
+    publishTicketCreatedMock.mockReturnValue(false);
+
+    await expect(service.create(tenant, {
+      customerId,
+      subject: 'General question',
+    })).resolves.toBe(ticket);
+
+    expect(publishTicketCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketCreatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: ticket.id,
+    });
   });
 
   it('uses NORMAL priority by default', async () => {
@@ -428,6 +486,7 @@ describe('TicketsService', () => {
     expect(
       ticketCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketCreatedMock).not.toHaveBeenCalled();
   });
 
   it('lists only tickets from the tenant', async () => {
@@ -503,6 +562,119 @@ describe('TicketsService', () => {
     );
   });
 
+  it.each([
+    { subject: 'Updated subject' },
+    { description: null },
+    { priority: 'HIGH' as const },
+  ])('publishes a ticket update after saving %j', async (input) => {
+    ticketFindFirstMock.mockResolvedValue({ id: 'ticket-1' });
+    const ticket = { id: 'ticket-1', ...input };
+    ticketUpdateMock.mockImplementation(async () => {
+      expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+      return ticket;
+    });
+    publishTicketUpdatedMock.mockReturnValue(false);
+
+    await expect(service.update(tenant, 'ticket-1', input)).resolves.toBe(ticket);
+
+    expect(ticketUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'ticket-1' },
+      data: input,
+    }));
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: ticket.id,
+    });
+  });
+
+  it.each([{}, { subject: undefined }])(
+    'does not publish a ticket update when no fields are provided: %j',
+    async (input) => {
+      await expect(service.update(tenant, 'ticket-1', input))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(ticketUpdateMock).not.toHaveBeenCalled();
+      expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not publish a ticket update for an unavailable ticket', async () => {
+    ticketFindFirstMock.mockResolvedValue(null);
+    await expect(service.update(tenant, 'foreign-ticket', {
+      subject: 'Updated subject',
+    })).rejects.toBeInstanceOf(NotFoundException);
+    expect(ticketUpdateMock).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a ticket update when saving fails', async () => {
+    ticketFindFirstMock.mockResolvedValue({ id: 'ticket-1' });
+    const error = new Error('Database unavailable');
+    ticketUpdateMock.mockRejectedValue(error);
+
+    await expect(service.update(tenant, 'ticket-1', {
+      subject: 'Updated subject',
+    })).rejects.toBe(error);
+
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+  });
+
+  it('publishes status updates only after the transaction resolves', async () => {
+    const ticket = { id: 'ticket-1', status: 'RESOLVED' };
+    transactionTicketFindFirstMock
+      .mockResolvedValueOnce({ id: ticket.id, status: 'OPEN' })
+      .mockResolvedValueOnce(ticket);
+    transactionTicketUpdateManyMock.mockResolvedValue({ count: 1 });
+
+    let finishCommit!: () => void;
+    const commit = new Promise<void>((resolve) => { finishCommit = resolve; });
+    let markReady!: () => void;
+    const ready = new Promise<void>((resolve) => { markReady = resolve; });
+    transactionMock.mockImplementationOnce(async (input) => {
+      if (Array.isArray(input)) {
+        throw new Error('Expected an interactive transaction');
+      }
+      const result = await input(transactionClient);
+      markReady();
+      await commit;
+      return result;
+    });
+
+    const pending = service.updateStatus(tenant, ticket.id, 'RESOLVED');
+    await ready;
+    try {
+      expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+    } finally {
+      finishCommit();
+    }
+    await expect(pending).resolves.toBe(ticket);
+
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: ticket.id,
+    });
+  });
+
+  it('does not publish a status update if the transaction fails to commit', async () => {
+    transactionTicketFindFirstMock
+      .mockResolvedValueOnce({ id: 'ticket-1', status: 'OPEN' })
+      .mockResolvedValueOnce({ id: 'ticket-1', status: 'RESOLVED' });
+    transactionTicketUpdateManyMock.mockResolvedValue({ count: 1 });
+    const error = new Error('Commit failed');
+    transactionMock.mockImplementationOnce(async (input) => {
+      if (Array.isArray(input)) {
+        throw new Error('Expected an interactive transaction');
+      }
+      await input(transactionClient);
+      throw error;
+    });
+
+    await expect(service.updateStatus(tenant, 'ticket-1', 'RESOLVED'))
+      .rejects.toBe(error);
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+  });
+
   it('resolves an open ticket', async () => {
     const ticketId =
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -554,6 +726,11 @@ describe('TicketsService', () => {
     expect(result.status).toBe(
       'RESOLVED',
     );
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId,
+    });
   });
 
   it('rejects invalid status transitions', async () => {
@@ -576,6 +753,7 @@ describe('TicketsService', () => {
     expect(
       transactionTicketUpdateManyMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
   });
 
   it('reopens a resolved ticket and clears lifecycle timestamps', async () => {
@@ -637,6 +815,7 @@ describe('TicketsService', () => {
     ).rejects.toBeInstanceOf(
       ConflictException,
     );
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
   });
 
   it('assigns a ticket to an agent inside the tenant', async () => {
@@ -711,6 +890,11 @@ describe('TicketsService', () => {
     expect(result.assignee.id).toBe(
       membershipId,
     );
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId,
+    });
   });
 
   it('rejects an assignee outside the tenant', async () => {
@@ -734,6 +918,7 @@ describe('TicketsService', () => {
     expect(
       ticketUpdateMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
   });
 
   it('prevents assigning tickets to viewers', async () => {
@@ -764,6 +949,7 @@ describe('TicketsService', () => {
     expect(
       ticketUpdateMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
   });
 
   it('unassigns a ticket', async () => {
@@ -799,6 +985,11 @@ describe('TicketsService', () => {
     );
 
     expect(result.assignee).toBeNull();
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: 'ticket-1',
+    });
   });
 
   it('does not assign an unavailable ticket', async () => {
@@ -823,6 +1014,7 @@ describe('TicketsService', () => {
     expect(
       ticketUpdateMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
   });
 
   it('adds an organization tag to a ticket', async () => {
@@ -900,9 +1092,15 @@ describe('TicketsService', () => {
         name: 'Bug',
       },
     ]);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId,
+    });
   });
 
-  it('rejects a tag outside the ticket tenant', async () => {
+  it.each(['addTag', 'removeTag'] as const)(
+    '%s rejects a tag outside the ticket tenant', async (operation) => {
     ticketFindFirstMock.mockResolvedValue({
       id: 'ticket-1',
     });
@@ -912,7 +1110,7 @@ describe('TicketsService', () => {
     );
 
     await expect(
-      service.addTag(
+      service[operation](
         tenant,
         'ticket-1',
         'foreign-tag',
@@ -924,15 +1122,18 @@ describe('TicketsService', () => {
     expect(
       ticketTagUpsertMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+    expect(ticketTagDeleteManyMock).not.toHaveBeenCalled();
   });
 
-  it('does not tag a ticket outside the tenant', async () => {
+  it.each(['addTag', 'removeTag'] as const)(
+    '%s rejects a ticket outside the tenant', async (operation) => {
     ticketFindFirstMock.mockResolvedValue(
       null,
     );
 
     await expect(
-      service.addTag(
+      service[operation](
         tenant,
         'foreign-ticket',
         'tag-1',
@@ -948,6 +1149,8 @@ describe('TicketsService', () => {
     expect(
       ticketTagUpsertMock,
     ).not.toHaveBeenCalled();
+    expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+    expect(ticketTagDeleteManyMock).not.toHaveBeenCalled();
   });
 
   it('removes a ticket tag', async () => {
@@ -990,6 +1193,11 @@ describe('TicketsService', () => {
     });
 
     expect(result.tags).toEqual([]);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishTicketUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: 'ticket-1',
+    });
   });
 
   it('creates a public member reply', async () => {
@@ -1064,6 +1272,18 @@ describe('TicketsService', () => {
   expect(
     result.authorType,
   ).toBe('MEMBER');
+  expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+    organizationId: tenant.organizationId,
+    ticketId: 'ticket-1',
+    messageId: 'message-1',
+  });
+  expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+    organizationId: tenant.organizationId,
+    ticketId: 'ticket-1',
+    messageId: 'message-1',
+    emailDeliveryId: 'email-delivery-1',
+    status: 'PENDING',
+  });
 });
 
 it('creates an internal note', async () => {
@@ -1112,11 +1332,42 @@ it('creates an internal note', async () => {
         }),
     }),
   );
+  expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+    organizationId: tenant.organizationId,
+    ticketId: 'ticket-1',
+    messageId: 'message-1',
+  });
+  expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+  expect(txEmailDeliveryCreateMock).not.toHaveBeenCalled();
 });
 
 it(
   'queues outbound email after creating a public reply',
   async () => {
+    const order: string[] = [];
+    transactionMock.mockImplementationOnce(async (input) => {
+      if (Array.isArray(input)) {
+        throw new Error('Expected an interactive transaction');
+      }
+      const result = await input(transactionClient);
+      expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+      expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+      expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
+      order.push('commit');
+      return result;
+    });
+    publishMessageCreatedMock.mockImplementation(() => {
+      order.push('message');
+      return false;
+    });
+    publishEmailDeliveryUpdatedMock.mockImplementation(() => {
+      order.push('delivery');
+      return false;
+    });
+    ensureEmailDeliveryQueuedMock.mockImplementation(async () => {
+      order.push('enqueue');
+    });
+
     const ticketId =
       'ticket-1';
 
@@ -1160,6 +1411,22 @@ it(
     expect(result.id).toBe(
       messageId,
     );
+
+    expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId,
+      messageId,
+    });
+    expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId,
+      messageId,
+      emailDeliveryId: 'email-delivery-1',
+      status: 'PENDING',
+    });
+    expect(order).toEqual(['commit', 'message', 'delivery', 'enqueue']);
 
     expect(
       txEmailDeliveryCreateMock,
@@ -1254,6 +1521,20 @@ it(
     expect(
       ensureEmailDeliveryQueuedMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: 'ticket-1',
+      messageId: 'message-1',
+    });
+    expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: 'ticket-1',
+      messageId: 'message-1',
+      emailDeliveryId: 'email-delivery-1',
+      status: 'FAILED',
+    });
   },
 );
 
@@ -1296,6 +1577,14 @@ it(
     expect(
       ensureEmailDeliveryQueuedMock,
     ).not.toHaveBeenCalled();
+    expect(txEmailDeliveryCreateMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishMessageCreatedMock).toHaveBeenCalledWith({
+      organizationId: tenant.organizationId,
+      ticketId: 'ticket-1',
+      messageId: 'message-1',
+    });
   },
 );
 
@@ -1347,6 +1636,37 @@ it(
         id: 'message-1',
       }),
     );
+    expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
+    expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(['PUBLIC_REPLY', 'INTERNAL_NOTE'] as const)(
+  'does not publish or enqueue %s if the transaction fails to commit',
+  async (kind) => {
+    transactionTicketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+      status: 'OPEN',
+      customer: { email: 'customer@example.com' },
+    });
+    txTicketMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+    const error = new Error('Commit failed');
+    transactionMock.mockImplementationOnce(async (input) => {
+      if (Array.isArray(input)) {
+        throw new Error('Expected an interactive transaction');
+      }
+      await input(transactionClient);
+      throw error;
+    });
+
+    await expect(service.createMessage(tenant, 'ticket-1', {
+      kind,
+      body: 'Saved only on commit.',
+    })).rejects.toBe(error);
+
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+    expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1376,6 +1696,8 @@ it('rejects public replies on closed tickets', async () => {
   expect(
     txTicketMessageCreateMock,
   ).not.toHaveBeenCalled();
+  expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+  expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
 });
 
 it('allows internal notes on closed tickets', async () => {
@@ -1432,6 +1754,8 @@ it('does not create messages on tickets outside the tenant', async () => {
   expect(
     txTicketMessageCreateMock,
   ).not.toHaveBeenCalled();
+  expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+  expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
 });
 
 it(
@@ -1586,6 +1910,8 @@ it(
     expect(
       txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1620,6 +1946,8 @@ it(
     expect(
       txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1667,6 +1995,8 @@ it(
     expect(
       txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1713,6 +2043,8 @@ it(
     expect(
       txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1758,6 +2090,8 @@ it(
     expect(
       txTicketMessageCreateMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1807,6 +2141,8 @@ it(
     expect(
       txTicketMessageFindFirstMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1836,6 +2172,8 @@ it(
     expect(
       transactionMock,
     ).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   },
 );
 

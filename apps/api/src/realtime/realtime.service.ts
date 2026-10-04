@@ -56,13 +56,6 @@ export class RealtimeService {
         string;
     },
   ): boolean {
-    const namespace =
-      this.getNamespace();
-
-    if (!namespace) {
-      return false;
-    }
-
     const payload:
       TicketCreatedRealtimePayload =
       {
@@ -77,19 +70,23 @@ export class RealtimeService {
             .toISOString(),
       };
 
-    namespace
-      .to(
-        organizationRoom(
-          input.organizationId,
-        ),
-      )
-      .emit(
-        REALTIME_EVENTS
-          .TICKET_CREATED,
-        payload,
-      );
-
-    return true;
+    return this.publish(
+      (
+        namespace,
+      ) => {
+        namespace
+          .to(
+            organizationRoom(
+              input.organizationId,
+            ),
+          )
+          .emit(
+            REALTIME_EVENTS
+              .TICKET_CREATED,
+            payload,
+          );
+      },
+    );
   }
 
   publishTicketUpdated(
@@ -101,13 +98,6 @@ export class RealtimeService {
         string;
     },
   ): boolean {
-    const namespace =
-      this.getNamespace();
-
-    if (!namespace) {
-      return false;
-    }
-
     const payload:
       TicketUpdatedRealtimePayload =
       {
@@ -122,25 +112,29 @@ export class RealtimeService {
             .toISOString(),
       };
 
-    namespace
-      .to(
-        organizationRoom(
-          input.organizationId,
-        ),
-      )
-      .to(
-        ticketRoom(
-          input.organizationId,
-          input.ticketId,
-        ),
-      )
-      .emit(
-        REALTIME_EVENTS
-          .TICKET_UPDATED,
-        payload,
-      );
-
-    return true;
+    return this.publish(
+      (
+        namespace,
+      ) => {
+        namespace
+          .to(
+            organizationRoom(
+              input.organizationId,
+            ),
+          )
+          .to(
+            ticketRoom(
+              input.organizationId,
+              input.ticketId,
+            ),
+          )
+          .emit(
+            REALTIME_EVENTS
+              .TICKET_UPDATED,
+            payload,
+          );
+      },
+    );
   }
 
   publishMessageCreated(
@@ -155,13 +149,6 @@ export class RealtimeService {
         string;
     },
   ): boolean {
-    const namespace =
-      this.getNamespace();
-
-    if (!namespace) {
-      return false;
-    }
-
     const payload:
       TicketMessageCreatedRealtimePayload =
       {
@@ -179,25 +166,29 @@ export class RealtimeService {
             .toISOString(),
       };
 
-    namespace
-      .to(
-        organizationRoom(
-          input.organizationId,
-        ),
-      )
-      .to(
-        ticketRoom(
-          input.organizationId,
-          input.ticketId,
-        ),
-      )
-      .emit(
-        REALTIME_EVENTS
-          .TICKET_MESSAGE_CREATED,
-        payload,
-      );
-
-    return true;
+    return this.publish(
+      (
+        namespace,
+      ) => {
+        namespace
+          .to(
+            organizationRoom(
+              input.organizationId,
+            ),
+          )
+          .to(
+            ticketRoom(
+              input.organizationId,
+              input.ticketId,
+            ),
+          )
+          .emit(
+            REALTIME_EVENTS
+              .TICKET_MESSAGE_CREATED,
+            payload,
+          );
+      },
+    );
   }
 
   publishEmailDeliveryUpdated(
@@ -218,13 +209,6 @@ export class RealtimeService {
         EmailDeliveryStatus;
     },
   ): boolean {
-    const namespace =
-      this.getNamespace();
-
-    if (!namespace) {
-      return false;
-    }
-
     const payload:
       EmailDeliveryUpdatedRealtimePayload =
       {
@@ -248,20 +232,24 @@ export class RealtimeService {
             .toISOString(),
       };
 
-    namespace
-      .to(
-        ticketRoom(
-          input.organizationId,
-          input.ticketId,
-        ),
-      )
-      .emit(
-        REALTIME_EVENTS
-          .EMAIL_DELIVERY_UPDATED,
-        payload,
-      );
-
-    return true;
+    return this.publish(
+      (
+        namespace,
+      ) => {
+        namespace
+          .to(
+            ticketRoom(
+              input.organizationId,
+              input.ticketId,
+            ),
+          )
+          .emit(
+            REALTIME_EVENTS
+              .EMAIL_DELIVERY_UPDATED,
+            payload,
+          );
+      },
+    );
   }
 
   private getNamespace():
@@ -283,4 +271,35 @@ export class RealtimeService {
 
     return this.namespace;
   }
+  private publish(
+  action:
+    (
+      namespace:
+        RealtimeNamespace,
+    ) => void,
+): boolean {
+  const namespace =
+    this.getNamespace();
+
+  if (!namespace) {
+    return false;
+  }
+
+  try {
+    action(
+      namespace,
+    );
+
+    return true;
+  } catch (error) {
+    this.logger.error(
+      'Failed to publish realtime event',
+      error instanceof Error
+        ? error.stack
+        : undefined,
+    );
+
+    return false;
+  }
+}
 }

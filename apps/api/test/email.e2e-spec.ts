@@ -33,6 +33,10 @@ import {
 import request from 'supertest';
 
 import {
+  RealtimePublisherModule,
+} from '../src/realtime/realtime-publisher.module.js';
+
+import {
   IS_PUBLIC_KEY,
 } from '../src/auth/public.decorator.js';
 
@@ -324,6 +328,9 @@ describe(
         const moduleRef =
           await Test
             .createTestingModule({
+              imports: [
+                RealtimePublisherModule,
+              ],
               controllers: [
                 TicketsController,
                 ResendWebhookController,

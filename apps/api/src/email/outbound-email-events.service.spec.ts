@@ -14,8 +14,21 @@ import {
   OutboundEmailEventsService,
 } from './outbound-email-events.service.js';
 
+import type {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
 const DELIVERY_ID =
   '819f42f7-5181-4eb7-9f33-256c89ff6f4c';
+
+const ORG_ID =
+  '11111111-1111-4111-8111-111111111111';
+
+const TICKET_ID =
+  '22222222-2222-4222-8222-222222222222';
+
+const MESSAGE_ID =
+  '33333333-3333-4333-8333-333333333333';
 
 describe(
   'OutboundEmailEventsService',
@@ -28,6 +41,22 @@ describe(
 
     const txDeliveryUpdateManyMock =
       jest.fn();
+
+    const publishEmailDeliveryUpdatedMock =
+      jest.fn<RealtimeService['publishEmailDeliveryUpdated']>();
+
+    const realtime = {
+      publishEmailDeliveryUpdated: publishEmailDeliveryUpdatedMock,
+    };
+
+    const delivery = {
+      id: DELIVERY_ID,
+      organizationId: ORG_ID,
+      ticketId: TICKET_ID,
+      messageId: MESSAGE_ID,
+      status: 'SENT',
+      providerMessageId: null,
+    };
 
     const transactionClient = {
       webhookEvent: {
@@ -48,7 +77,7 @@ describe(
             (
               tx:
                 typeof transactionClient,
-            ) => Promise<void>,
+            ) => Promise<{ statusChanged: boolean }>,
         ) =>
           callback(
             transactionClient,
@@ -71,6 +100,10 @@ describe(
     beforeEach(() => {
       jest.resetAllMocks();
 
+      deliveryFindUniqueMock.mockResolvedValue(delivery);
+      txDeliveryUpdateManyMock.mockResolvedValue({ count: 1 });
+      publishEmailDeliveryUpdatedMock.mockReturnValue(false);
+
       transactionMock
         .mockImplementation(
           async (
@@ -84,14 +117,31 @@ describe(
       service =
         new OutboundEmailEventsService(
           prisma as unknown as PrismaService,
+          realtime as unknown as RealtimeService,
         );
     });
 
     it(
       'correlates a delivered event by tag and prevents terminal regression',
       async () => {
+        let committed = false;
+        transactionMock.mockImplementationOnce(async (callback) => {
+          const result = await callback(transactionClient);
+          expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+          committed = true;
+          return result;
+        });
+        publishEmailDeliveryUpdatedMock.mockImplementation(() => {
+          expect(committed).toBe(true);
+          return false;
+        });
+        txDeliveryUpdateManyMock
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 1 });
+
         deliveryFindUniqueMock
           .mockResolvedValue({
+            ...delivery,
             id:
               DELIVERY_ID,
 
@@ -185,6 +235,14 @@ describe(
           status:
             'processed',
         });
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+          organizationId: delivery.organizationId,
+          ticketId: delivery.ticketId,
+          messageId: delivery.messageId,
+          emailDeliveryId: DELIVERY_ID,
+          status: 'DELIVERED',
+        });
       },
     );
 
@@ -223,6 +281,7 @@ describe(
         expect(
           transactionMock,
         ).not.toHaveBeenCalled();
+        expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       },
     );
 
@@ -258,6 +317,7 @@ describe(
       ) => {
         deliveryFindUniqueMock
           .mockResolvedValue({
+            ...delivery,
             id:
               DELIVERY_ID,
           });
@@ -306,6 +366,14 @@ describe(
 
           data,
         });
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+          organizationId: delivery.organizationId,
+          ticketId: delivery.ticketId,
+          messageId: delivery.messageId,
+          emailDeliveryId: DELIVERY_ID,
+          status: expectedStatus,
+        });
       },
     );
 
@@ -334,6 +402,7 @@ describe(
       ) => {
         deliveryFindUniqueMock
           .mockResolvedValue({
+            ...delivery,
             id:
               DELIVERY_ID,
           });
@@ -380,19 +449,32 @@ describe(
               expect.any(Date),
           },
         });
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+        expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledWith({
+          organizationId: delivery.organizationId,
+          ticketId: delivery.ticketId,
+          messageId: delivery.messageId,
+          emailDeliveryId: DELIVERY_ID,
+          status: expectedStatus,
+        });
       },
     );
 
     it(
       'does not allow a late sent event to regress a delivered status',
       async () => {
+        txDeliveryUpdateManyMock
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 0 });
         deliveryFindUniqueMock
           .mockResolvedValue({
+            ...delivery,
+            status: 'DELIVERED',
             id:
               DELIVERY_ID,
           });
 
-        await service.handle(
+        const result = await service.handle(
           'email.sent',
           {
             emailId:
@@ -427,6 +509,8 @@ describe(
             },
           }),
         );
+        expect(result).toEqual({ status: 'processed' });
+        expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       },
     );
 
@@ -435,6 +519,7 @@ describe(
       async () => {
         deliveryFindUniqueMock
           .mockResolvedValue({
+            ...delivery,
             id:
               DELIVERY_ID,
           });
@@ -471,7 +556,26 @@ describe(
           status:
             'duplicate',
         });
+        expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       },
     );
+
+    it('does not publish a delivery update if the transaction fails to commit', async () => {
+      const error = new Error('Commit failed');
+      transactionMock.mockImplementationOnce(async (callback) => {
+        await callback(transactionClient);
+        throw error;
+      });
+
+      await expect(service.handle('email.delivered', {
+        emailId: 'resend-email-commit',
+        tags: { opsdesk_delivery_id: DELIVERY_ID },
+      }, {
+        webhookMessageId: 'webhook-message-commit',
+      })).rejects.toBe(error);
+
+      expect(txDeliveryUpdateManyMock).toHaveBeenCalledTimes(2);
+      expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+    });
   },
 );

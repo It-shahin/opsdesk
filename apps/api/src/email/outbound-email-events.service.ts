@@ -6,6 +6,10 @@ import {
   PrismaService,
 } from '../database/prisma.service.js';
 
+import {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
 import type {
   EmailDeliveryStatus,
 } from '../generated/prisma/enums.js';
@@ -43,6 +47,9 @@ export class OutboundEmailEventsService {
   constructor(
     private readonly prisma:
       PrismaService,
+
+    private readonly realtime:
+      RealtimeService,
   ) {}
 
   async handle(
@@ -99,8 +106,8 @@ export class OutboundEmailEventsService {
       );
 
     try {
-      await this.prisma
-        .$transaction(
+      const transition =
+        await this.prisma.$transaction(
           async (
             tx,
           ) => {
@@ -149,23 +156,50 @@ export class OutboundEmailEventsService {
                 },
               });
 
-            await tx.emailDelivery
-              .updateMany({
-                where: {
-                  id:
-                    delivery.id,
+            const statusUpdate =
+              await tx.emailDelivery
+                .updateMany({
+                  where: {
+                    id:
+                      delivery.id,
 
-                  status: {
-                    in:
-                      mapped.allowedFrom,
+                    status: {
+                      in:
+                        mapped.allowedFrom,
+                    },
                   },
-                },
 
-                data:
-                  mapped.data,
-              });
+                  data:
+                    mapped.data,
+                });
+
+            return {
+              statusChanged:
+                statusUpdate.count ===
+                1,
+            };
           },
         );
+
+      if (transition.statusChanged) {
+        this.realtime
+          .publishEmailDeliveryUpdated({
+            organizationId:
+              delivery.organizationId,
+
+            ticketId:
+              delivery.ticketId,
+
+            messageId:
+              delivery.messageId,
+
+            emailDeliveryId:
+              delivery.id,
+
+            status:
+              mapped.data.status,
+          });
+      }
 
       return {
         status:
