@@ -1,7 +1,7 @@
 import {
   Injectable,
   Logger,
-  OnModuleDestroy,
+  OnApplicationShutdown,
 } from '@nestjs/common';
 
 import {
@@ -20,7 +20,7 @@ import {
 
 @Injectable()
 export class RealtimeRedisAdapterService
-  implements OnModuleDestroy
+  implements OnApplicationShutdown
 {
   private readonly logger =
     new Logger(
@@ -137,7 +137,9 @@ export class RealtimeRedisAdapterService
     );
   }
 
-  async onModuleDestroy() {
+  // Nest disposes Socket.IO before this hook, so the adapter can unsubscribe
+  // while its dedicated Redis connections are still open.
+  async onApplicationShutdown() {
     if (
       !this.connected
     ) {

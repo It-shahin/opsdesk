@@ -10,10 +10,6 @@ import type {
   createAdapter,
 } from '@socket.io/redis-adapter';
 
-import type {
-  Server,
-} from 'socket.io';
-
 type IoServerOptions = NonNullable<
   Parameters<IoAdapter['createIOServer']>[1]
 >;
