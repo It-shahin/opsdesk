@@ -27,8 +27,12 @@ import {
 } from '../tickets/tickets.module.js';
 
 import {
-  RealtimePublisherModule,
-} from './realtime-publisher.module.js';
+  RealtimeRedisAdapterService,
+} from './realtime-redis-adapter.service.js';
+
+import {
+  RedisModule,
+} from '../redis/redis.module.js';
 
 @Module({
   imports: [
@@ -37,11 +41,12 @@ import {
     TenancyModule,
     RbacModule,
     TicketsModule,
-    RealtimePublisherModule
+    RedisModule,
   ],
 
   providers: [
     RealtimeGateway,
+    RealtimeRedisAdapterService,
   ],
 
   exports: [

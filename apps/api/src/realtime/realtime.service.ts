@@ -14,7 +14,6 @@ import {
 
 import type {
   EmailDeliveryUpdatedRealtimePayload,
-  RealtimeNamespace,
   TicketCreatedRealtimePayload,
   TicketMessageCreatedRealtimePayload,
   TicketUpdatedRealtimePayload,
@@ -24,6 +23,18 @@ import type {
   EmailDeliveryStatus,
 } from '../generated/prisma/enums.js';
 
+import type {
+  Emitter,
+} from '@socket.io/redis-emitter';
+
+import {
+  RealtimeRedisEmitterService,
+} from './realtime-redis-emitter.service.js';
+
+import type {
+  ServerToClientEvents,
+} from './realtime.types.js';
+
 @Injectable()
 export class RealtimeService {
   private readonly logger =
@@ -31,21 +42,10 @@ export class RealtimeService {
       RealtimeService.name,
     );
 
-  private namespace:
-    RealtimeNamespace |
-    undefined;
-
-  bindNamespace(
-    namespace:
-      RealtimeNamespace,
-  ) {
-    this.namespace =
-      namespace;
-
-    this.logger.log(
-      'Realtime publisher bound to Socket.IO namespace',
-    );
-  }
+  constructor(
+    private readonly redisEmitter:
+      RealtimeRedisEmitterService,
+  ) {}
 
   publishTicketCreated(
     input: {
@@ -72,9 +72,9 @@ export class RealtimeService {
 
     return this.publish(
       (
-        namespace,
+        emitter,
       ) => {
-        namespace
+        emitter
           .to(
             organizationRoom(
               input.organizationId,
@@ -114,9 +114,9 @@ export class RealtimeService {
 
     return this.publish(
       (
-        namespace,
+        emitter,
       ) => {
-        namespace
+        emitter
           .to(
             organizationRoom(
               input.organizationId,
@@ -168,9 +168,9 @@ export class RealtimeService {
 
     return this.publish(
       (
-        namespace,
+        emitter,
       ) => {
-        namespace
+        emitter
           .to(
             organizationRoom(
               input.organizationId,
@@ -234,9 +234,9 @@ export class RealtimeService {
 
     return this.publish(
       (
-        namespace,
+        emitter,
       ) => {
-        namespace
+        emitter
           .to(
             ticketRoom(
               input.organizationId,
@@ -252,54 +252,31 @@ export class RealtimeService {
     );
   }
 
-  private getNamespace():
-    RealtimeNamespace |
-    null {
-    if (!this.namespace) {
-      /*
-       * Realtime delivery is ephemeral.
-       * Failure to publish must never
-       * corrupt the primary database
-       * operation.
-       */
-      this.logger.warn(
-        'Realtime namespace is not initialized; event skipped',
+  private publish(
+    action:
+      (
+        emitter:
+          Emitter<
+            ServerToClientEvents
+          >,
+      ) => void,
+  ): boolean {
+    try {
+      action(
+        this.redisEmitter
+          .getEmitter(),
       );
 
-      return null;
+      return true;
+    } catch (error) {
+      this.logger.error(
+        'Failed to publish realtime event',
+        error instanceof Error
+          ? error.stack
+          : undefined,
+      );
+
+      return false;
     }
-
-    return this.namespace;
   }
-  private publish(
-  action:
-    (
-      namespace:
-        RealtimeNamespace,
-    ) => void,
-): boolean {
-  const namespace =
-    this.getNamespace();
-
-  if (!namespace) {
-    return false;
-  }
-
-  try {
-    action(
-      namespace,
-    );
-
-    return true;
-  } catch (error) {
-    this.logger.error(
-      'Failed to publish realtime event',
-      error instanceof Error
-        ? error.stack
-        : undefined,
-    );
-
-    return false;
-  }
-}
 }

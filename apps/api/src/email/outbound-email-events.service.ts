@@ -236,7 +236,6 @@ export class OutboundEmailEventsService {
           allowedFrom: [
             'PENDING',
             'SENDING',
-            'SENT',
           ],
 
           data: {
@@ -254,7 +253,6 @@ export class OutboundEmailEventsService {
             'PENDING',
             'SENDING',
             'SENT',
-            'DELAYED',
           ],
 
           data: {

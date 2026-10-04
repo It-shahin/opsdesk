@@ -46,6 +46,14 @@ import {
   buildTicketReplyEmail,
 } from '../email/ticket-reply-email.js';
 
+import {
+  RealtimeService,
+} from '../realtime/realtime.service.js';
+
+import type {
+  EmailDeliveryStatus,
+} from '../generated/prisma/enums.js';
+
 @Injectable()
 export class EmailWorker
   implements
@@ -75,6 +83,10 @@ export class EmailWorker
 
   private readonly jobsService:
     JobsService,
+
+  private readonly realtime:
+    RealtimeService,
+
 ) {
   this.connection =
     createWorkerRedisConnection(
@@ -196,6 +208,9 @@ export class EmailWorker
             id: true,
             status: true,
             recipientEmail: true,
+            organizationId: true,
+            ticketId: true,
+            messageId: true,
 
             message: {
               select: {
@@ -290,31 +305,44 @@ export class EmailWorker
       };
     }
 
+    this.publishDeliveryStatus(
+      delivery,
+      'SENDING',
+    );
+
     if (
       !delivery.recipientEmail
     ) {
-      await this.prisma
-        .emailDelivery
-        .updateMany({
-          where: {
-            id:
-              delivery.id,
+      const failed =
+        await this.prisma
+          .emailDelivery
+          .updateMany({
+            where: {
+              id:
+                delivery.id,
 
-            status:
-              'SENDING',
-          },
+              status:
+                'SENDING',
+            },
 
-          data: {
-            status:
-              'FAILED',
+            data: {
+              status:
+                'FAILED',
 
-            failedAt:
-              new Date(),
+              failedAt:
+                new Date(),
 
-            lastError:
-              'Recipient email is missing',
-          },
-        });
+              lastError:
+                'Recipient email is missing',
+            },
+          });
+
+      if (failed.count === 1) {
+        this.publishDeliveryStatus(
+          delivery,
+          'FAILED',
+        );
+      }
 
       throw new UnrecoverableError(
         'Recipient email is missing',
@@ -327,6 +355,37 @@ export class EmailWorker
       delivery.message.authorType !==
         'MEMBER'
     ) {
+      const failed =
+        await this.prisma
+          .emailDelivery
+          .updateMany({
+            where: {
+              id:
+                delivery.id,
+
+              status:
+                'SENDING',
+            },
+
+            data: {
+              status:
+                'FAILED',
+
+              failedAt:
+                new Date(),
+
+              lastError:
+                'Invalid email message state',
+            },
+          });
+
+      if (failed.count === 1) {
+        this.publishDeliveryStatus(
+          delivery,
+          'FAILED',
+        );
+      }
+
       throw new UnrecoverableError(
         'Email delivery references an invalid message',
       );
@@ -368,6 +427,33 @@ export class EmailWorker
             ...email,
           });
 
+      const sent =
+        await this.prisma
+          .emailDelivery
+          .updateMany({
+            where: {
+              id:
+                delivery.id,
+
+              status:
+                'SENDING',
+            },
+
+            data: {
+              status:
+                'SENT',
+
+              providerMessageId:
+                result.providerMessageId,
+
+              sentAt:
+                new Date(),
+
+              lastError:
+                null,
+            },
+          });
+
       await this.prisma
         .emailDelivery
         .updateMany({
@@ -375,32 +461,6 @@ export class EmailWorker
             id:
               delivery.id,
 
-            status:
-              'SENDING',
-          },
-
-          data: {
-            status:
-              'SENT',
-
-            providerMessageId:
-              result.providerMessageId,
-
-            sentAt:
-              new Date(),
-
-            lastError:
-              null,
-          },
-        });
-
-      await this.prisma
-        .emailDelivery
-        .updateMany({
-          where: {
-            id:
-              delivery.id,
-
             providerMessageId:
               null,
           },
@@ -410,6 +470,13 @@ export class EmailWorker
               result.providerMessageId,
           },
         });
+
+      if (sent.count === 1) {
+        this.publishDeliveryStatus(
+          delivery,
+          'SENT',
+        );
+      }
 
       this.logger.log(
         `Sent email delivery ${delivery.id}; provider message ${result.providerMessageId}`,
@@ -441,6 +508,47 @@ export class EmailWorker
         !retryable ||
         thisWasFinalAttempt
       ) {
+        const failed =
+          await this.prisma
+            .emailDelivery
+            .updateMany({
+              where: {
+                id:
+                  delivery.id,
+
+                status:
+                  'SENDING',
+              },
+
+              data: {
+                status:
+                  'FAILED',
+
+                failedAt:
+                  new Date(),
+
+                lastError:
+                  safeError,
+              },
+            });
+
+        if (failed.count === 1) {
+          this.publishDeliveryStatus(
+            delivery,
+            'FAILED',
+          );
+        }
+
+        if (!retryable) {
+          throw new UnrecoverableError(
+            'Permanent email delivery failure',
+          );
+        }
+
+        throw error;
+      }
+
+      const reset =
         await this.prisma
           .emailDelivery
           .updateMany({
@@ -454,47 +562,58 @@ export class EmailWorker
 
             data: {
               status:
-                'FAILED',
-
-              failedAt:
-                new Date(),
+                'PENDING',
 
               lastError:
                 safeError,
             },
           });
 
-        if (!retryable) {
-          throw new UnrecoverableError(
-            'Permanent email delivery failure',
-          );
-        }
-
-        throw error;
+      if (reset.count === 1) {
+        this.publishDeliveryStatus(
+          delivery,
+          'PENDING',
+        );
       }
-
-      await this.prisma
-        .emailDelivery
-        .updateMany({
-          where: {
-            id:
-              delivery.id,
-
-            status:
-              'SENDING',
-          },
-
-          data: {
-            status:
-              'PENDING',
-
-            lastError:
-              safeError,
-          },
-        });
 
       throw error;
     }
+  }
+
+  private publishDeliveryStatus(
+    delivery: {
+      id:
+        string;
+
+      organizationId:
+        string;
+
+      ticketId:
+        string;
+
+      messageId:
+        string;
+    },
+
+    status:
+      EmailDeliveryStatus,
+  ) {
+    this.realtime
+      .publishEmailDeliveryUpdated({
+        organizationId:
+          delivery.organizationId,
+
+        ticketId:
+          delivery.ticketId,
+
+        messageId:
+          delivery.messageId,
+
+        emailDeliveryId:
+          delivery.id,
+
+        status,
+      });
   }
 
   private async processRecovery() {
@@ -504,27 +623,75 @@ export class EmailWorker
         10 * 60 * 1000,
       );
 
-    await this.prisma
-      .emailDelivery
-      .updateMany({
-        where: {
-          status:
-            'SENDING',
+    const staleDeliveries =
+      await this.prisma
+        .emailDelivery
+        .findMany({
+          where: {
+            status:
+              'SENDING',
 
-          lastAttemptAt: {
-            lt:
-              staleBefore,
+            lastAttemptAt: {
+              lt:
+                staleBefore,
+            },
           },
-        },
 
-        data: {
-          status:
-            'PENDING',
+          select: {
+            id:
+              true,
 
-          lastError:
-            'Recovered stale sending attempt',
-        },
-      });
+            organizationId:
+              true,
+
+            ticketId:
+              true,
+
+            messageId:
+              true,
+          },
+
+          take:
+            100,
+        });
+
+    for (
+      const delivery
+      of staleDeliveries
+    ) {
+      const reset =
+        await this.prisma
+          .emailDelivery
+          .updateMany({
+            where: {
+              id:
+                delivery.id,
+
+              status:
+                'SENDING',
+
+              lastAttemptAt: {
+                lt:
+                  staleBefore,
+              },
+            },
+
+            data: {
+              status:
+                'PENDING',
+
+              lastError:
+                'Recovered stale sending attempt',
+            },
+          });
+
+      if (reset.count === 1) {
+        this.publishDeliveryStatus(
+          delivery,
+          'PENDING',
+        );
+      }
+    }
 
     const pending =
       await this.prisma

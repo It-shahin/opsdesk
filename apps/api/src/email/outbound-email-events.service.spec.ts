@@ -292,7 +292,6 @@ describe(
         [
           'PENDING',
           'SENDING',
-          'SENT',
         ],
         'sentAt',
       ],
@@ -303,7 +302,6 @@ describe(
           'PENDING',
           'SENDING',
           'SENT',
-          'DELAYED',
         ],
         null,
       ],
@@ -318,6 +316,7 @@ describe(
         deliveryFindUniqueMock
           .mockResolvedValue({
             ...delivery,
+            status: 'SENDING',
             id:
               DELIVERY_ID,
           });
@@ -503,13 +502,40 @@ describe(
                 in: [
                   'PENDING',
                   'SENDING',
-                  'SENT',
                 ],
               },
             },
           }),
         );
         expect(result).toEqual({ status: 'processed' });
+        expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      { eventType: 'email.sent', status: 'SENT' },
+      { eventType: 'email.delivery_delayed', status: 'DELAYED' },
+    ] as const)(
+      'does not publish another $status event when $eventType matches the current status',
+      async ({ eventType, status }) => {
+        deliveryFindUniqueMock.mockResolvedValue({ ...delivery, status });
+        txDeliveryUpdateManyMock.mockImplementation(async (input) => {
+          if (!input.where.status) {
+            return { count: 1 };
+          }
+          // Model the database match so allowing the current status
+          // would cause this regression test to publish an extra event.
+          return { count: input.where.status.in.includes(status) ? 1 : 0 };
+        });
+
+        await expect(service.handle(eventType, {
+          emailId: 'resend-email-same-state',
+          tags: { opsdesk_delivery_id: DELIVERY_ID },
+        }, {
+          webhookMessageId: 'webhook-message-same-state',
+        })).resolves.toEqual({ status: 'processed' });
+
+        expect(txDeliveryUpdateManyMock).toHaveBeenCalledTimes(2);
         expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       },
     );

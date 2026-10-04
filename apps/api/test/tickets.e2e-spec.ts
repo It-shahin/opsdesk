@@ -25,6 +25,7 @@ import {
 } from '../src/jobs/jobs.service.js';
 import { PermissionGuard } from '../src/rbac/permission.guard.js';
 import { RealtimePublisherModule } from '../src/realtime/realtime-publisher.module.js';
+import { RedisService } from '../src/redis/redis.service.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
 import { TenantContextService } from '../src/tenancy/tenant-context.service.js';
 import type { TenantAuthenticatedRequest } from '../src/tenancy/tenant-context.types.js';
@@ -361,7 +362,10 @@ describe('Tickets HTTP security', () => {
             },
           },
         ],
-      }).compile();
+      })
+        .overrideProvider(RedisService)
+        .useValue({ getClient: () => ({ publish: async () => 0 }) })
+        .compile();
 
     app =
       moduleRef.createNestApplication();

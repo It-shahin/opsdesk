@@ -10,7 +10,6 @@ import type { PermissionsService } from '../rbac/permissions.service.js';
 import { PERMISSIONS } from '../rbac/permissions.js';
 import type { TicketsService } from '../tickets/tickets.service.js';
 import { RealtimeGateway } from './realtime.gateway.js';
-import type { RealtimeService } from './realtime.service.js';
 import type { AuthenticatedSocket, RealtimeSocketData } from './realtime.types.js';
 
 describe('RealtimeGateway', () => {
@@ -35,8 +34,6 @@ describe('RealtimeGateway', () => {
   const resolveTenantMock = jest.fn<TenantContextService['resolve']>();
   const hasPermissionMock = jest.fn<PermissionsService['hasPermission']>();
   const ticketExistsMock = jest.fn<TicketsService['existsInOrganization']>();
-  const bindNamespaceMock = jest.fn<RealtimeService['bindNamespace']>();
-  const realtime = { bindNamespace: bindNamespaceMock };
   const permissions = { hasPermission: hasPermissionMock };
   const ticketsService = { existsInOrganization: ticketExistsMock };
   const usersService = { syncAuthenticatedUser: syncAuthenticatedUserMock };
@@ -54,16 +51,15 @@ describe('RealtimeGateway', () => {
       tenantContext as unknown as TenantContextService,
       permissions as unknown as PermissionsService,
       ticketsService as unknown as TicketsService,
-      realtime as unknown as RealtimeService,
     );
 
     gateway.afterInit({ use: useMock } as unknown as Namespace);
     middleware = useMock.mock.calls[0]![0];
   });
 
-  it('binds the namespace to the realtime publisher', () => {
-    expect(bindNamespaceMock).toHaveBeenCalledTimes(1);
-    expect(bindNamespaceMock).toHaveBeenCalledWith({ use: useMock });
+  it('registers the socket authentication middleware', () => {
+    expect(useMock).toHaveBeenCalledTimes(1);
+    expect(useMock).toHaveBeenCalledWith(expect.any(Function));
   });
 
   function createSocket(token?: string) {

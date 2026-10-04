@@ -7,8 +7,8 @@ import {
 } from '@jest/globals';
 
 import type {
-  RealtimeNamespace,
-} from './realtime.types.js';
+  RealtimeRedisEmitterService,
+} from './realtime-redis-emitter.service.js';
 
 import {
   RealtimeService,
@@ -41,12 +41,17 @@ describe(
     const firstToMock =
       jest.fn();
 
+    const getEmitterMock =
+      jest.fn<RealtimeRedisEmitterService['getEmitter']>();
+
+    const redisEmitter = {
+      getEmitter:
+        getEmitterMock,
+    };
+
     beforeEach(
       () => {
         jest.resetAllMocks();
-
-        service =
-          new RealtimeService();
 
         secondToMock
           .mockReturnValue({
@@ -63,13 +68,19 @@ describe(
               emitMock,
           });
 
-        service.bindNamespace(
+        getEmitterMock.mockReturnValue(
           {
             to:
               firstToMock,
           } as unknown as
-            RealtimeNamespace,
+            ReturnType<RealtimeRedisEmitterService['getEmitter']>,
         );
+
+        service =
+          new RealtimeService(
+            redisEmitter as unknown as
+              RealtimeRedisEmitterService,
+          );
       },
     );
 
@@ -326,13 +337,14 @@ describe(
     );
 
     it(
-      'safely skips events before the namespace is initialized',
+      'safely skips events when the Redis emitter is unavailable',
       () => {
-        const unbound =
-          new RealtimeService();
+        getEmitterMock.mockImplementation(() => {
+          throw new Error('Redis emitter unavailable');
+        });
 
         expect(
-          unbound
+          service
             .publishTicketCreated({
               organizationId:
                 ORG_A,
@@ -345,7 +357,7 @@ describe(
         );
 
         expect(
-          unbound
+          service
             .publishTicketUpdated({
               organizationId:
                 ORG_A,
@@ -358,7 +370,7 @@ describe(
         );
 
         expect(
-          unbound
+          service
             .publishMessageCreated({
               organizationId:
                 ORG_A,
@@ -374,7 +386,7 @@ describe(
         );
 
         expect(
-          unbound
+          service
             .publishEmailDeliveryUpdated({
               organizationId:
                 ORG_A,
@@ -406,6 +418,7 @@ describe(
         expect(
           emitMock,
         ).not.toHaveBeenCalled();
+        expect(getEmitterMock).toHaveBeenCalledTimes(4);
       },
     );
   },

@@ -40,3 +40,6 @@ export const REALTIME_EVENTS = {
   EMAIL_DELIVERY_UPDATED:
     'email.delivery.updated',
 } as const;
+
+export const REALTIME_REDIS_KEY =
+  'opsdesk:socket.io';

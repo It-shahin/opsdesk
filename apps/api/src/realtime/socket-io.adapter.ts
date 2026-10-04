@@ -6,9 +6,22 @@ import {
   IoAdapter,
 } from '@nestjs/platform-socket.io';
 
+import type {
+  createAdapter,
+} from '@socket.io/redis-adapter';
+
+import type {
+  Server,
+} from 'socket.io';
+
 type IoServerOptions = NonNullable<
   Parameters<IoAdapter['createIOServer']>[1]
 >;
+
+type RedisAdapterConstructor =
+  ReturnType<
+    typeof createAdapter
+  >;
 
 export class SocketIoAdapter
   extends IoAdapter
@@ -19,6 +32,10 @@ export class SocketIoAdapter
 
     private readonly webOrigin:
       string,
+
+    private readonly redisAdapter:
+    RedisAdapterConstructor,
+
   ) {
     super(
       app,
@@ -26,27 +43,42 @@ export class SocketIoAdapter
   }
 
   override createIOServer(
-    port:
-      number,
+  port:
+    number,
 
-    options?:
-      Partial<IoServerOptions>,
-  ): ReturnType<IoAdapter['createIOServer']> {
-    const serverOptions: Partial<IoServerOptions> = {
+  options?:
+    Partial<IoServerOptions>,
+): ReturnType<
+  IoAdapter['createIOServer']
+> {
+  const serverOptions:
+    Partial<IoServerOptions> =
+    {
       ...options,
+
       cors: {
-        origin: this.webOrigin,
-        methods: ['GET', 'POST'],
-        // Authentication uses the Socket.IO auth payload, without cookies.
-        credentials: false,
+        origin:
+          this.webOrigin,
+
+        methods: [
+          'GET',
+          'POST',
+        ],
+
+        credentials:
+          false,
       },
     };
 
-    // Socket.IO accepts partial options and fills in defaults. Nest's
-    // createIOServer declaration requires the complete options type.
-    return super.createIOServer(
-      port,
-      serverOptions as IoServerOptions,
-    );
-  }
+  const server = super.createIOServer(
+    port,
+    serverOptions as IoServerOptions,
+  );
+
+  server.adapter(
+    this.redisAdapter,
+  );
+
+  return server;
+}
 }

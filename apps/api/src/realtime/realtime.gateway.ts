@@ -68,14 +68,6 @@ import type {
   TicketRoomPayload,
 } from './realtime.types.js';
 
-import {
-  RealtimeService,
-} from './realtime.service.js';
-
-import type {
-  RealtimeNamespace,
-} from './realtime.types.js';
-
 @WebSocketGateway({
   namespace:
     REALTIME_NAMESPACE,
@@ -294,20 +286,12 @@ async leaveOrganization(
   private readonly ticketsService:
     TicketsService,
 
-  private readonly realtime:
-    RealtimeService,
 ) {}
 
   afterInit(
   namespace:
     Namespace,
 ) {
-  this.realtime
-    .bindNamespace(
-      namespace as
-        RealtimeNamespace,
-    );
-
   this.logger.log(
     `Realtime namespace initialized: ${REALTIME_NAMESPACE}`,
   );

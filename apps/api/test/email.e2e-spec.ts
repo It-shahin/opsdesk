@@ -37,6 +37,10 @@ import {
 } from '../src/realtime/realtime-publisher.module.js';
 
 import {
+  RedisService,
+} from '../src/redis/redis.service.js';
+
+import {
   IS_PUBLIC_KEY,
 } from '../src/auth/public.decorator.js';
 
@@ -414,6 +418,8 @@ describe(
                 },
               ],
             })
+            .overrideProvider(RedisService)
+            .useValue({ getClient: () => ({ publish: async () => 0 }) })
             .compile();
 
         inboundEmail =
