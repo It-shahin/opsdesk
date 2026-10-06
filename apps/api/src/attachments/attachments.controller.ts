@@ -53,6 +53,7 @@ export class AttachmentsController {
   ) {}
 
   @Post('init')
+  @HttpCode(200)
   @RequirePermissions(
     PERMISSIONS.TICKETS_WRITE,
   )

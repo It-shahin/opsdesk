@@ -324,7 +324,7 @@ describe('Attachment HTTP security', () => {
         contentType: 'text/plain',
         sizeBytes: 100,
       })
-      .expect(201);
+      .expect(200);
 
     expect(response.body.attachment.status).toBe('PENDING');
     expect(response.body.upload.url).toBe('https://r2.example/signed-put');
