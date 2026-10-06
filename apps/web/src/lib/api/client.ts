@@ -101,8 +101,28 @@ export async function apiClientFetch<
         message =
           candidate.error;
       }
+
+      else if (
+        Array.isArray(
+            candidate.message,
+        ) &&
+        candidate.message.every(
+            (
+            item,
+            ) =>
+            typeof item ===
+            'string',
+        )
+        ) {
+        message =
+            candidate.message
+            .join(
+                ', ',
+            );
+        }
     }
 
+    
     throw new ApiClientError(
       response.status,
       message,

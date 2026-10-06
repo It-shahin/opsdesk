@@ -388,6 +388,23 @@ export class InboundEmailService {
                     },
                   });
 
+              await transaction
+                .ticket
+                .updateMany({
+                  where: {
+                    id:
+                      ticket.id,
+
+                    organizationId:
+                      ticket.organizationId,
+                  },
+
+                  data: {
+                    updatedAt:
+                      new Date(),
+                  },
+                });
+
               /*
                * A customer reply means
                * this ticket requires

@@ -9,6 +9,7 @@ import type {
   TicketPriority,
   TicketStatus,
   TicketMessage,
+  TicketAttachment,
 } from '@/lib/tickets/types';
 
 import type {
@@ -42,6 +43,45 @@ interface AttachmentDownloadResponse {
   download: {
     url:
       string;
+
+    expiresInSeconds:
+      number;
+  };
+}
+
+interface AttachmentUploadInitResponse {
+  attachment: {
+    id:
+      string;
+
+    originalName:
+      string;
+
+    contentType:
+      string;
+
+    sizeBytes:
+      number;
+
+    status:
+      'PENDING';
+
+    uploadedAt:
+      null;
+  };
+
+  upload: {
+    url:
+      string;
+
+    method:
+      'PUT';
+
+    headers:
+      Record<
+        string,
+        string
+      >;
 
     expiresInSeconds:
       number;
@@ -226,5 +266,148 @@ export function getAttachmentDownload(
     AttachmentDownloadResponse
   >(
     `/api/organizations/${organizationId}/tickets/${ticketId}/attachments/${attachmentId}/download`,
+  );
+}
+
+export function initiateTicketAttachment(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  file:
+    File,
+) {
+  return apiClientFetch<
+    AttachmentUploadInitResponse
+  >(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/attachments/init`,
+    {
+      method:
+        'POST',
+
+      body:
+        JSON.stringify({
+          originalName:
+            file.name,
+
+          contentType:
+            file.type,
+
+          sizeBytes:
+            file.size,
+        }),
+    },
+  );
+}
+
+export function completeTicketAttachment(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  attachmentId:
+    string,
+) {
+  return apiClientFetch<
+    TicketAttachment
+  >(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/attachments/${attachmentId}/complete`,
+    {
+      method:
+        'POST',
+    },
+  );
+}
+
+export function createTicketMessage(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  input: {
+    kind:
+      'PUBLIC_REPLY' |
+      'INTERNAL_NOTE';
+
+    body:
+      string;
+
+    attachmentIds?:
+      string[];
+  },
+) {
+  return apiClientFetch<
+    TicketMessage
+  >(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/messages`,
+    {
+      method:
+        'POST',
+
+      body:
+        JSON.stringify(
+          input,
+        ),
+    },
+  );
+}
+
+export async function uploadTicketAttachment(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  file:
+    File,
+) {
+  const initiated =
+    await initiateTicketAttachment(
+      organizationId,
+      ticketId,
+      file,
+    );
+
+  const upload =
+    await fetch(
+      initiated.upload.url,
+      {
+        method:
+          initiated.upload
+            .method,
+
+        headers:
+          initiated.upload
+            .headers,
+
+        body:
+          file,
+
+        credentials:
+          'omit',
+      },
+    );
+
+  if (
+    !upload.ok
+  ) {
+    throw new Error(
+      `Failed to upload ${file.name}`,
+    );
+  }
+
+  return completeTicketAttachment(
+    organizationId,
+    ticketId,
+    initiated
+      .attachment
+      .id,
   );
 }

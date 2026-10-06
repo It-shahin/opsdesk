@@ -1363,6 +1363,21 @@ async createMessage(
           },
         });
 
+      await transaction.ticket.updateMany({
+        where: {
+          id:
+            ticket.id,
+
+          organizationId:
+            tenant.organizationId,
+        },
+
+        data: {
+          updatedAt:
+            new Date(),
+        },
+      });
+
       if (
         uniqueAttachmentIds.length >
         0

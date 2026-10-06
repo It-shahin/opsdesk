@@ -14,6 +14,10 @@ import {
   TicketDetailView,
 } from '@/components/tickets/ticket-detail-view';
 
+import {
+  getOrganizationForUser,
+} from '@/lib/api/organizations.server';
+
 type TicketPageProps = {
   params:
     Promise<{
@@ -34,34 +38,55 @@ export default async function TicketPage({
   } =
     await params;
 
-  let ticket;
-
-  try {
-    ticket =
-      await getTicket(
+  const [
+    ticket,
+    organization,
+  ] =
+    await Promise.all([
+      getTicket(
         organizationId,
         ticketId,
-      );
-  } catch (
-    error
-  ) {
-    if (
-      error instanceof
-        ApiServerError &&
-      error.status ===
-        404
-    ) {
-      notFound();
-    }
+      ),
 
-    throw error;
+      getOrganizationForUser(
+        organizationId,
+      ),
+    ]).catch(
+      (error: unknown) => {
+        if (
+          error instanceof
+            ApiServerError &&
+          error.status ===
+            404
+        ) {
+          notFound();
+        }
+
+        throw error;
+      },
+    );
+
+  if (
+    !organization
+  ) {
+    notFound();
   }
 
   return (
     <TicketDetailView
-      organizationId={organizationId}
-      ticketId={ticketId}
-      initialTicket={ticket}
+      organizationId={
+        organizationId
+      }
+      ticketId={
+        ticketId
+      }
+      initialTicket={
+        ticket
+      }
+      canWrite={
+        organization.role !==
+        'VIEWER'
+      }
     />
   );
 }

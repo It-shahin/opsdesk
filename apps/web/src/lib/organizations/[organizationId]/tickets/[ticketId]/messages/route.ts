@@ -1,6 +1,6 @@
 import {
-  proxyAuthenticatedGet,
-} from '@/lib/api/proxy-get';
+  proxyAuthenticatedRequest,
+} from '@/lib/api/proxy-request';
 
 type RouteContext = {
   params:
@@ -13,10 +13,7 @@ type RouteContext = {
     }>;
 };
 
-export async function GET(
-  request:
-    Request,
-
+async function path(
   context:
     RouteContext,
 ) {
@@ -26,13 +23,39 @@ export async function GET(
   } =
     await context.params;
 
-  return proxyAuthenticatedGet(
-    request,
+  return `/v1/organizations/${encodeURIComponent(
+    organizationId,
+  )}/tickets/${encodeURIComponent(
+    ticketId,
+  )}/messages`;
+}
 
-    `/v1/organizations/${encodeURIComponent(
-      organizationId,
-    )}/tickets/${encodeURIComponent(
-      ticketId,
-    )}/messages`,
+export async function GET(
+  request:
+    Request,
+
+  context:
+    RouteContext,
+) {
+  return proxyAuthenticatedRequest(
+    request,
+    await path(
+      context,
+    ),
+  );
+}
+
+export async function POST(
+  request:
+    Request,
+
+  context:
+    RouteContext,
+) {
+  return proxyAuthenticatedRequest(
+    request,
+    await path(
+      context,
+    ),
   );
 }

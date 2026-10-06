@@ -30,10 +30,15 @@ import {
   getTicketClient,
 } from '@/lib/api/tickets.client';
 
+import {
+  TicketComposer,
+} from './ticket-composer';
+
 export function TicketDetailView({
   organizationId,
   ticketId,
   initialTicket,
+  canWrite,
 }: {
   organizationId:
     string;
@@ -43,6 +48,9 @@ export function TicketDetailView({
 
   initialTicket:
     TicketDetail;
+
+  canWrite:
+    boolean;
 }) {
   const ticketQuery =
     useQuery({
@@ -158,18 +166,27 @@ export function TicketDetailView({
           />
 
           <div
-            className="border-t bg-muted/20 p-4"
-          >
-            <div
-              className="flex min-h-24 items-center justify-center rounded-lg border border-dashed bg-background"
-            >
-              <p
-                className="text-sm text-muted-foreground"
-              >
-                Reply composer arrives in 9E.
-              </p>
-            </div>
-          </div>
+        className="border-t bg-muted/20 p-4"
+        >
+        <TicketComposer
+            organizationId={
+            organizationId
+            }
+            ticketId={
+            ticketId
+            }
+            ticketStatus={
+            ticket.status
+            }
+            customerEmail={
+            ticket.customer
+                .email
+            }
+            canWrite={
+            canWrite
+            }
+        />
+        </div>
         </section>
 
         <TicketContext

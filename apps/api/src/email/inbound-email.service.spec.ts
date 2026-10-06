@@ -251,7 +251,10 @@ describe(
           });
 
         txTicketUpdateManyMock
-          .mockResolvedValue({
+          .mockResolvedValueOnce({
+            count: 1,
+          })
+          .mockResolvedValueOnce({
             count: reopenedCount,
           });
 
@@ -347,7 +350,22 @@ describe(
 
         expect(
           txTicketUpdateManyMock,
-        ).toHaveBeenCalledWith({
+        ).toHaveBeenCalledTimes(2);
+        expect(txTicketUpdateManyMock).toHaveBeenNthCalledWith(1, {
+          where: {
+            id: TICKET_ID,
+            organizationId: ORG_ID,
+          },
+          data: {
+            updatedAt: expect.any(Date),
+          },
+        });
+        expect(txMessageCreateMock.mock.invocationCallOrder[0]).toBeLessThan(
+          txTicketUpdateManyMock.mock.invocationCallOrder[0],
+        );
+        expect(
+          txTicketUpdateManyMock,
+        ).toHaveBeenNthCalledWith(2, {
           where: {
             id:
               TICKET_ID,
@@ -401,6 +419,47 @@ describe(
           expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
           expect(order).toEqual(['commit', 'message']);
         }
+      },
+    );
+
+    it.each(['message', 'activity'] as const)(
+      'does not publish inbound events when the %s write fails',
+      async (failedWrite) => {
+        const recipients = [`ticket-${TICKET_ID}@abc.resend.app`];
+        getReceivedEmailMock.mockResolvedValue({
+          from: 'jane@example.com',
+          to: recipients,
+          text: 'Customer reply.',
+        });
+        ticketFindFirstMock.mockResolvedValue({
+          id: TICKET_ID,
+          organizationId: ORG_ID,
+          status: 'OPEN',
+          customer: { email: 'jane@example.com' },
+        });
+        txMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+        const error = new Error('Write failed');
+        if (failedWrite === 'message') {
+          txMessageCreateMock.mockRejectedValue(error);
+        } else {
+          txTicketUpdateManyMock.mockRejectedValue(error);
+        }
+
+        await expect(service.handleReceivedEmail({
+          emailId: 'received-email-1',
+          from: 'jane@example.com',
+          to: recipients,
+        }, {
+          webhookMessageId: 'webhook-message-1',
+          providerEntityId: 'received-email-1',
+          eventType: 'email.received',
+        })).rejects.toBe(error);
+
+        expect(txTicketUpdateManyMock).toHaveBeenCalledTimes(
+          failedWrite === 'message' ? 0 : 1,
+        );
+        expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+        expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
       },
     );
 
@@ -491,6 +550,7 @@ describe(
         expect(
           txMessageCreateMock,
         ).not.toHaveBeenCalled();
+        expect(txTicketUpdateManyMock).not.toHaveBeenCalled();
       },
     );
 
