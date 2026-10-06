@@ -6,6 +6,10 @@ import {
   getOrganizationForUser,
 } from '@/lib/api/organizations.server';
 
+import {
+  TicketInbox,
+} from '@/components/tickets/ticket-inbox';
+
 type WorkspacePageProps = {
   params:
     Promise<{
@@ -53,20 +57,15 @@ export default async function WorkspacePage({
         <p
           className="mt-2 text-sm text-muted-foreground"
         >
-          Your support tickets will
-          appear here.
+          Search and filter your
+          workspace&apos;s support tickets.
         </p>
       </div>
 
-      <div
-        className="flex min-h-72 items-center justify-center rounded-xl border border-dashed bg-background"
-      >
-        <p
-          className="text-sm text-muted-foreground"
-        >
-          Ticket inbox arrives in 9C.
-        </p>
-      </div>
+      <TicketInbox
+        key={organization.id}
+        organizationId={organization.id}
+      />
     </div>
   );
 }

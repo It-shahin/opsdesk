@@ -1,9 +1,7 @@
 'use client';
 
-import {
+import type {
   FormEvent,
-  useEffect,
-  useState,
 } from 'react';
 
 import {
@@ -141,25 +139,6 @@ export function TicketInbox({
       'search',
     ) ??
     '';
-
-  const [
-    search,
-    setSearch,
-  ] =
-    useState(
-      searchParam,
-    );
-
-  useEffect(
-    () => {
-      setSearch(
-        searchParam,
-      );
-    },
-    [
-      searchParam,
-    ],
-  );
 
   const status =
     searchParams.get(
@@ -355,11 +334,16 @@ export function TicketInbox({
   ) {
     event.preventDefault();
 
+    const search =
+      new FormData(
+        event.currentTarget,
+      ).get('search');
+
     updateParams({
       search:
-        search
-          .trim() ||
-        null,
+        typeof search === 'string'
+          ? search.trim() || null
+          : null,
 
       page:
         null,
@@ -396,18 +380,10 @@ export function TicketInbox({
           />
 
           <Input
-            value={
-              search
-            }
-            onChange={
-              (
-                event,
-              ) =>
-                setSearch(
-                  event.target
-                    .value,
-                )
-            }
+            aria-label="Search tickets or customers"
+            key={searchParams.toString()}
+            name="search"
+            defaultValue={searchParam}
             placeholder="Search tickets or customers…"
             className="pl-9"
           />
@@ -417,6 +393,7 @@ export function TicketInbox({
           className="flex flex-wrap gap-2"
         >
           <select
+            aria-label="Status"
             value={
               status ??
               ''
@@ -458,6 +435,7 @@ export function TicketInbox({
           </select>
 
           <select
+            aria-label="Priority"
             value={
               priority ??
               ''
@@ -499,6 +477,7 @@ export function TicketInbox({
           </select>
 
           <select
+            aria-label="Assignee"
             value={
               assigneeMembershipId ??
               ''
@@ -551,6 +530,7 @@ export function TicketInbox({
           </select>
 
           <select
+            aria-label="Tag"
             value={
               tagId ??
               ''
@@ -600,6 +580,7 @@ export function TicketInbox({
           </select>
 
           <select
+            aria-label="Sort tickets"
             value={
               `${sortBy}-${sortOrder}`
             }
@@ -662,10 +643,6 @@ export function TicketInbox({
               type="button"
               onClick={
                 () => {
-                  setSearch(
-                    '',
-                  );
-
                   updateParams({
                     search:
                       null,
