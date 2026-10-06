@@ -1,55 +1,95 @@
+import {
+  cookies,
+} from 'next/headers';
+
+import {
+  redirect,
+} from 'next/navigation';
+
+import {
+  CreateOrganizationDialog,
+} from '@/components/organizations/create-organization-dialog';
+
+import {
+  getOrganizations,
+} from '@/lib/api/organizations.server';
+
+import {
+  ACTIVE_ORGANIZATION_COOKIE,
+} from '@/lib/organizations/constants';
+
 export const metadata = {
   title:
     'Workspace',
 };
 
-export default function AppHomePage() {
+export default async function AppHomePage() {
+  const organizations =
+    await getOrganizations();
+
+  if (
+    organizations.length >
+    0
+  ) {
+    const cookieStore =
+      await cookies();
+
+    const preferredId =
+      cookieStore.get(
+        ACTIVE_ORGANIZATION_COOKIE,
+      )?.value;
+
+    const preferred =
+      preferredId
+        ? organizations.find(
+            (
+              organization,
+            ) =>
+              organization.id ===
+              preferredId,
+          )
+        : null;
+
+    const active =
+      preferred ??
+      organizations[0];
+
+    redirect(
+      `/app/${active.id}`,
+    );
+  }
+
   return (
     <div
-      className="mx-auto max-w-6xl space-y-8"
+      className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center"
     >
-      <div>
-        <p
-          className="text-sm font-medium text-muted-foreground"
+      <div
+        className="w-full rounded-xl border border-dashed bg-background p-10 text-center"
+      >
+        <div
+          className="mx-auto flex size-12 items-center justify-center rounded-xl bg-muted text-lg font-semibold"
         >
-          Workspace
-        </p>
+          OD
+        </div>
 
         <h1
-          className="mt-1 text-2xl font-semibold tracking-tight"
+          className="mt-5 text-xl font-semibold"
         >
-          Welcome to OpsDesk
+          Create your first workspace
         </h1>
 
         <p
-          className="mt-2 max-w-2xl text-sm text-muted-foreground"
+          className="mx-auto mt-2 max-w-md text-sm text-muted-foreground"
         >
-          Manage customer conversations,
-          tickets, and your support team
-          from one workspace.
+          Workspaces keep customers,
+          tickets and team members
+          separated between organizations.
         </p>
-      </div>
 
-      <div
-        className="flex min-h-72 items-center justify-center rounded-xl border border-dashed bg-background p-8"
-      >
         <div
-          className="max-w-md text-center"
+          className="mt-6 flex justify-center"
         >
-          <h2
-            className="font-medium"
-          >
-            Choose your workspace
-          </h2>
-
-          <p
-            className="mt-2 text-sm text-muted-foreground"
-          >
-            Your organizations will
-            appear here so you can
-            select where you want to
-            work.
-          </p>
+          <CreateOrganizationDialog />
         </div>
       </div>
     </div>

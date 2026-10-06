@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 
 import {
@@ -30,6 +32,22 @@ import {
 import type {
   CurrentUser,
 } from '@/lib/api/current-user';
+
+import {
+  usePathname,
+} from 'next/navigation';
+
+import {
+  WorkspaceSwitcher,
+} from '@/components/organizations/workspace-switcher';
+
+import {
+  CreateOrganizationDialog,
+} from '@/components/organizations/create-organization-dialog';
+
+import type {
+  Organization,
+} from '@/lib/organizations/types';
 
 function getInitials(
   user:
@@ -64,14 +82,37 @@ function getInitials(
 
 export function AppShell({
   user,
+  organizations,
   children,
 }: Readonly<{
   user:
     CurrentUser;
 
+  organizations:
+    Organization[];
+
   children:
     React.ReactNode;
 }>) {
+    const pathname =
+    usePathname();
+
+    const pathParts =
+    pathname
+        .split('/')
+        .filter(Boolean);
+
+    const organizationId =
+    pathParts[0] ===
+        'app'
+        ? pathParts[1]
+        : undefined;
+
+    const inboxHref =
+    organizationId
+        ? `/app/${organizationId}`
+        : '/app';
+
   return (
     <div
       className="min-h-screen bg-muted/20"
@@ -106,18 +147,38 @@ export function AppShell({
             </div>
           </div>
 
+          <div
+            className="flex gap-2 border-b p-3"
+          >
+            <div
+              className="min-w-0 flex-1"
+            >
+              <WorkspaceSwitcher
+                organizations={
+                  organizations
+                }
+              />
+            </div>
+
+            <CreateOrganizationDialog
+              iconOnly
+            />
+          </div>
+
           <nav
             className="flex-1 space-y-1 p-3"
           >
             <Link
-              href="/app"
-              className="flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium"
-            >
-              <Inbox
-                className="size-4"
-              />
+                href={
+                    inboxHref
+                }
+                className="flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium"
+                >
+                <Inbox
+                    className="size-4"
+                />
 
-              Inbox
+                Inbox
             </Link>
 
             <div
@@ -165,14 +226,16 @@ export function AppShell({
           className="flex min-w-0 flex-1 flex-col"
         >
           <header
-            className="flex h-16 items-center justify-between border-b bg-background px-4 sm:px-6"
+            className="flex h-16 items-center justify-end border-b bg-background px-4 sm:px-6"
           >
-            <div>
-              <p
-                className="text-sm font-medium lg:hidden"
-              >
-                OpsDesk
-              </p>
+            <div
+              className="min-w-0 flex-1 lg:hidden"
+            >
+              <WorkspaceSwitcher
+                organizations={
+                  organizations
+                }
+              />
             </div>
 
             <DropdownMenu>

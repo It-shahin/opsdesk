@@ -14,6 +14,10 @@ import {
   auth0,
 } from '@/lib/auth0';
 
+import {
+  getOrganizations,
+} from '@/lib/api/organizations.server';
+
 export const dynamic =
   'force-dynamic';
 
@@ -33,14 +37,23 @@ export default async function AppLayout({
     );
   }
 
-  const user =
-    await getCurrentUser();
+  const [
+  user,
+  organizations,
+] =
+  await Promise.all([
+    getCurrentUser(),
+    getOrganizations(),
+  ]);
 
   return (
     <AppShell
-      user={user}
-    >
-      {children}
+        user={user}
+        organizations={
+            organizations
+        }
+        >
+        {children}
     </AppShell>
   );
 }
