@@ -1,7 +1,8 @@
 'use client';
 
 import {
-  FormEvent,
+  type FormEvent,
+  useId,
   useState,
 } from 'react';
 
@@ -24,6 +25,7 @@ import {
 
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -54,6 +56,9 @@ export function CreateOrganizationDialog({
 }) {
   const router =
     useRouter();
+
+  const nameId = useId();
+  const errorId = `${nameId}-error`;
 
   const [
     open,
@@ -120,7 +125,9 @@ export function CreateOrganizationDialog({
       name.trim();
 
     if (
-      !trimmed
+      mutation.isPending ||
+      trimmed.length < 2 ||
+      trimmed.length > 80
     ) {
       return;
     }
@@ -134,7 +141,19 @@ export function CreateOrganizationDialog({
     <Dialog
       open={open}
       onOpenChange={
-        setOpen
+        (nextOpen, details) => {
+          if (mutation.isPending) {
+            details.cancel();
+            return;
+          }
+
+          if (nextOpen) {
+            mutation.reset();
+            setName('');
+          }
+
+          setOpen(nextOpen);
+        }
       }
     >
       <DialogTrigger
@@ -150,6 +169,16 @@ export function CreateOrganizationDialog({
                 ? 'icon'
                 : 'default'
             }
+            className={
+              iconOnly
+                ? 'size-10 shrink-0'
+                : undefined
+            }
+            title={
+              iconOnly
+                ? 'Create workspace'
+                : undefined
+            }
             aria-label={
               iconOnly
                 ? 'Create workspace'
@@ -159,6 +188,7 @@ export function CreateOrganizationDialog({
         }
       >
         <Plus
+          aria-hidden="true"
           className="size-4"
         />
 
@@ -168,11 +198,13 @@ export function CreateOrganizationDialog({
 
       <DialogContent
         className="sm:max-w-md"
+        showCloseButton={!mutation.isPending}
       >
         <form
           onSubmit={
             submit
           }
+          aria-busy={mutation.isPending}
         >
           <DialogHeader>
             <DialogTitle>
@@ -190,13 +222,13 @@ export function CreateOrganizationDialog({
             className="py-6"
           >
             <Label
-              htmlFor="organization-name"
+              htmlFor={nameId}
             >
               Workspace name
             </Label>
 
             <Input
-              id="organization-name"
+              id={nameId}
               value={name}
               onChange={
                 (
@@ -208,8 +240,16 @@ export function CreateOrganizationDialog({
                   )
               }
               placeholder="Acme Support"
-              className="mt-2"
-              autoFocus
+              className="mt-2 h-10"
+              required
+              minLength={2}
+              maxLength={80}
+              aria-invalid={mutation.isError}
+              aria-describedby={
+                mutation.isError
+                  ? errorId
+                  : undefined
+              }
               disabled={
                 mutation.isPending
               }
@@ -217,7 +257,9 @@ export function CreateOrganizationDialog({
 
             {mutation.isError && (
               <p
-                className="mt-2 text-sm text-destructive"
+                id={errorId}
+                role="alert"
+                className="mt-2 break-words text-sm text-destructive"
               >
                 {mutation.error
                   .message}
@@ -226,20 +268,36 @@ export function CreateOrganizationDialog({
           </div>
 
           <DialogFooter>
+            <DialogClose
+              disabled={mutation.isPending}
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                />
+              }
+            >
+              Cancel
+            </DialogClose>
+
             <Button
               type="submit"
               disabled={
                 mutation.isPending ||
-                !name.trim()
+                name.trim().length < 2 ||
+                name.trim().length > 80
               }
             >
               {mutation.isPending && (
                 <LoaderCircle
+                  aria-hidden="true"
                   className="size-4 animate-spin"
                 />
               )}
 
-              Create workspace
+              {mutation.isPending
+                ? 'Creating workspace...'
+                : 'Create workspace'}
             </Button>
           </DialogFooter>
         </form>

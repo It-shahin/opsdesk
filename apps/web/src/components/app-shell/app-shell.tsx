@@ -23,6 +23,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -148,7 +149,7 @@ export function AppShell({
           </div>
 
           <div
-            className="flex gap-2 border-b p-3"
+            className="flex items-center gap-2 border-b p-3"
           >
             <div
               className="min-w-0 flex-1"
@@ -226,15 +227,23 @@ export function AppShell({
           className="flex min-w-0 flex-1 flex-col"
         >
           <header
-            className="flex h-16 items-center justify-end border-b bg-background px-4 sm:px-6"
+            className="flex h-16 items-center justify-end gap-3 border-b bg-background px-4 sm:px-6"
           >
             <div
-              className="min-w-0 flex-1 lg:hidden"
+              className="flex min-w-0 flex-1 items-center gap-2 lg:hidden"
             >
-              <WorkspaceSwitcher
-                organizations={
-                  organizations
-                }
+              <div
+                className="min-w-0 flex-1"
+              >
+                <WorkspaceSwitcher
+                  organizations={
+                    organizations
+                  }
+                />
+              </div>
+
+              <CreateOrganizationDialog
+                iconOnly
               />
             </div>
 
@@ -291,26 +300,28 @@ export function AppShell({
                 align="end"
                 className="w-56"
               >
-                <DropdownMenuLabel>
-                  My account
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    My account
+                  </DropdownMenuLabel>
 
-                <DropdownMenuSeparator />
+                  <DropdownMenuSeparator />
 
-                <DropdownMenuItem
-                  render={
-                    <a
-                      href="/auth/logout"
+                  <DropdownMenuItem
+                    render={
+                      <a
+                        href="/auth/logout"
+                      />
+                    }
+                    className="cursor-pointer"
+                  >
+                    <LogOut
+                      className="size-4"
                     />
-                  }
-                  className="cursor-pointer"
-                >
-                  <LogOut
-                    className="size-4"
-                  />
 
-                  Log out
-                </DropdownMenuItem>
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </header>

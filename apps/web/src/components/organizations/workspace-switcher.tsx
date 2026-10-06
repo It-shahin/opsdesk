@@ -2,6 +2,7 @@
 
 import {
   useState,
+  useTransition,
 } from 'react';
 
 import {
@@ -22,6 +23,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -72,6 +74,15 @@ export function WorkspaceSwitcher({
   const router =
     useRouter();
 
+  const [open, setOpen] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [isNavigating, startTransition] =
+    useTransition();
+
   const [
     pendingId,
     setPendingId,
@@ -82,6 +93,10 @@ export function WorkspaceSwitcher({
     >(
       null,
     );
+
+  const isPending =
+    pendingId !== null ||
+    isNavigating;
 
   const activeId =
     getOrganizationId(
@@ -101,13 +116,19 @@ export function WorkspaceSwitcher({
     organizationId:
       string,
   ) {
+    if (isPending) {
+      return;
+    }
+
     if (
       organizationId ===
       activeId
     ) {
+      setOpen(false);
       return;
     }
 
+    setError(null);
     setPendingId(
       organizationId,
     );
@@ -124,8 +145,15 @@ export function WorkspaceSwitcher({
        * We don't preserve a ticket
        * detail ID from another tenant.
        */
-      router.push(
-        `/app/${organizationId}`,
+      setOpen(false);
+      startTransition(() => {
+        router.push(
+          `/app/${organizationId}`,
+        );
+      });
+    } catch {
+      setError(
+        'Could not switch workspaces. Please try again.',
       );
     } finally {
       setPendingId(
@@ -135,8 +163,18 @@ export function WorkspaceSwitcher({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={open}
+      onOpenChange={setOpen}
+    >
       <DropdownMenuTrigger
+        disabled={isPending}
+        aria-busy={isPending}
+        aria-label={
+          active
+            ? `Switch workspace, current workspace: ${active.name}`
+            : 'Select workspace'
+        }
         render={
           <Button
             variant="outline"
@@ -145,10 +183,11 @@ export function WorkspaceSwitcher({
         }
       >
         <span
-          className="min-w-0 text-left"
+          className="min-w-0 flex-1 text-left"
         >
           <span
             className="block truncate text-sm font-medium"
+            title={active?.name}
           >
             {active?.name ??
               'Select workspace'}
@@ -156,85 +195,111 @@ export function WorkspaceSwitcher({
 
           {active && (
             <span
-              className="block text-xs text-muted-foreground"
+              className="block text-xs capitalize text-muted-foreground"
             >
-              {active.role}
+              {active.role.toLowerCase()}
             </span>
           )}
         </span>
 
-        <ChevronsUpDown
-          className="size-4 shrink-0 text-muted-foreground"
-        />
+        {isPending ? (
+          <LoaderCircle
+            aria-hidden="true"
+            className="size-4 shrink-0 animate-spin text-muted-foreground"
+          />
+        ) : (
+          <ChevronsUpDown
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="start"
-        className="min-w-56"
+        className="w-64 max-w-[calc(100vw-2rem)]"
       >
-        <DropdownMenuLabel>
-          Workspaces
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            Workspaces
+          </DropdownMenuLabel>
 
-        <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-        {organizations.length ===
-        0 ? (
-          <div
-            className="px-2 py-3 text-sm text-muted-foreground"
-          >
-            No workspaces yet.
-          </div>
-        ) : (
-          organizations.map(
-            (
-              organization,
-            ) => (
-              <DropdownMenuItem
-                key={
-                  organization.id
-                }
-                disabled={
-                  pendingId !==
-                  null
-                }
-                onClick={
-                  () =>
-                    void selectOrganization(
-                      organization.id,
-                    )
-                }
-              >
-                <span
-                  className="min-w-0 flex-1"
+          {organizations.length ===
+          0 ? (
+            <div
+              className="px-2 py-3 text-sm text-muted-foreground"
+            >
+              No workspaces yet.
+            </div>
+          ) : (
+            organizations.map(
+              (
+                organization,
+              ) => (
+                <DropdownMenuItem
+                  key={
+                    organization.id
+                  }
+                  disabled={isPending}
+                  closeOnClick={false}
+                  label={organization.name}
+                  aria-current={
+                    activeId === organization.id
+                      ? 'true'
+                      : undefined
+                  }
+                  onClick={
+                    () =>
+                      void selectOrganization(
+                        organization.id,
+                      )
+                  }
                 >
                   <span
-                    className="block truncate"
+                    className="min-w-0 flex-1"
                   >
-                    {organization.name}
+                    <span
+                      className="block truncate"
+                      title={organization.name}
+                    >
+                      {organization.name}
+                    </span>
+
+                    <span
+                      className="block text-xs capitalize text-muted-foreground"
+                    >
+                      {organization.role.toLowerCase()}
+                    </span>
                   </span>
 
-                  <span
-                    className="block text-xs text-muted-foreground"
-                  >
-                    {organization.role}
-                  </span>
-                </span>
-
-                {pendingId ===
-                organization.id ? (
-                  <LoaderCircle
-                    className="ml-auto size-4 animate-spin"
-                  />
-                ) : activeId ===
+                  {pendingId ===
                   organization.id ? (
-                  <Check
-                    className="ml-auto size-4"
-                  />
-                ) : null}
-              </DropdownMenuItem>
-            ),
-          )
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="ml-auto size-4 animate-spin"
+                    />
+                  ) : activeId ===
+                    organization.id ? (
+                    <Check
+                      aria-hidden="true"
+                      className="ml-auto size-4"
+                    />
+                  ) : null}
+                </DropdownMenuItem>
+              ),
+            )
+          )}
+        </DropdownMenuGroup>
+
+        {error && (
+          <p
+            role="alert"
+            className="px-2 py-2 text-xs text-destructive"
+          >
+            {error}
+          </p>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
