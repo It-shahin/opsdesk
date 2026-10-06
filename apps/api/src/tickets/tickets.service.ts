@@ -440,6 +440,21 @@ export class TicketsService {
             archivedAt: true,
           },
         },
+        assignee: {
+          select: {
+            id: true,
+            role: true,
+
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
         tagLinks: {
           select: {
             tag: {

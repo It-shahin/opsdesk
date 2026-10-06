@@ -164,3 +164,83 @@ export interface TicketFilterTag {
       number;
   };
 }
+
+export type EmailDeliveryStatus =
+  | 'PENDING'
+  | 'SENDING'
+  | 'SENT'
+  | 'DELAYED'
+  | 'DELIVERED'
+  | 'BOUNCED'
+  | 'COMPLAINED'
+  | 'SUPPRESSED'
+  | 'FAILED';
+
+export interface TicketAttachment {
+  id:
+    string;
+
+  originalName:
+    string;
+
+  contentType:
+    string;
+
+  sizeBytes:
+    number;
+
+  status:
+    'PENDING' | 'UPLOADED';
+
+  uploadedAt:
+    string | null;
+}
+
+export interface TicketMessage {
+  id:
+    string;
+
+  kind:
+    'PUBLIC_REPLY' | 'INTERNAL_NOTE';
+
+  authorType:
+    'MEMBER' | 'CUSTOMER' | 'SYSTEM';
+
+  source:
+    'MANUAL' | 'EMAIL' | 'SYSTEM';
+
+  body:
+    string;
+
+  createdAt:
+    string;
+
+  updatedAt:
+    string;
+
+  authorMembership:
+    TicketAssignee | null;
+
+  emailDelivery: {
+    id:
+      string;
+
+    status:
+      EmailDeliveryStatus;
+
+    sentAt:
+      string | null;
+
+    deliveredAt:
+      string | null;
+
+    failedAt:
+      string | null;
+
+    createdAt:
+      string;
+  } | null;
+
+  attachments:
+    TicketAttachment[];
+}

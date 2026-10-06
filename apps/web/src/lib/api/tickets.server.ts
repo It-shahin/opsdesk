@@ -9,6 +9,7 @@ import type {
   TicketSource,
   TicketStatus,
   TicketTag,
+  TicketAssignee,
 } from '@/lib/tickets/types';
 
 export interface TicketDetail {
@@ -61,6 +62,9 @@ export interface TicketDetail {
     archivedAt:
       string | null;
   };
+
+  assignee:
+    TicketAssignee | null;
 
   tags:
     TicketTag[];
