@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
   useState,
 } from 'react';
 
@@ -158,6 +162,19 @@ export function TicketControls({
       organizationId,
       ticket.id,
     );
+
+    toast.success(
+      'Ticket updated',
+    );
+  }
+
+  function handleMutationError(
+    error:
+      Error,
+  ) {
+    toast.error(
+      error.message,
+    );
   }
 
   const statusMutation =
@@ -175,6 +192,9 @@ export function TicketControls({
 
       onSuccess:
         refresh,
+
+      onError:
+        handleMutationError,
     });
 
   const priorityMutation =
@@ -194,6 +214,9 @@ export function TicketControls({
 
       onSuccess:
         refresh,
+
+      onError:
+        handleMutationError,
     });
 
   const assigneeMutation =
@@ -211,6 +234,9 @@ export function TicketControls({
 
       onSuccess:
         refresh,
+
+      onError:
+        handleMutationError,
     });
 
   const addTagMutation =
@@ -228,6 +254,9 @@ export function TicketControls({
 
       onSuccess:
         refresh,
+
+      onError:
+        handleMutationError,
     });
 
   const removeTagMutation =
@@ -245,6 +274,9 @@ export function TicketControls({
 
       onSuccess:
         refresh,
+
+      onError:
+        handleMutationError,
     });
 
   const createTagMutation =
@@ -287,6 +319,9 @@ export function TicketControls({
               }),
           ]);
         },
+
+      onError:
+        handleMutationError,
     });
 
   if (
@@ -351,6 +386,7 @@ export function TicketControls({
         label="Status"
       >
         <select
+          aria-label="Ticket status"
           value={
             ticket.status
           }
@@ -378,7 +414,7 @@ export function TicketControls({
               }
             }
           }
-          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none"
+          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {statuses.map(
             (
@@ -417,6 +453,7 @@ export function TicketControls({
         label="Priority"
       >
         <select
+          aria-label="Ticket priority"
           value={
             ticket.priority
           }
@@ -444,7 +481,7 @@ export function TicketControls({
               }
             }
           }
-          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none"
+          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {priorities.map(
             (
@@ -469,6 +506,7 @@ export function TicketControls({
         label="Assignee"
       >
         <select
+          aria-label="Ticket assignee"
           value={
             ticket.assignee
               ?.id ??
@@ -491,7 +529,7 @@ export function TicketControls({
                     null,
                 )
           }
-          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none"
+          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option
             value=""
@@ -542,9 +580,14 @@ export function TicketControls({
                     tag.id
                   }
                   variant="outline"
-                  className="gap-1 pr-1"
+                  className="max-w-full gap-1 pr-1"
                 >
-                  {tag.name}
+                  <span
+                    className="min-w-0 truncate"
+                    title={tag.name}
+                  >
+                    {tag.name}
+                  </span>
 
                   <button
                     type="button"
@@ -559,7 +602,7 @@ export function TicketControls({
                             tag.id,
                           )
                     }
-                    className="rounded-sm p-0.5 hover:bg-muted"
+                    className="shrink-0 rounded-sm p-0.5 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={`Remove ${tag.name}`}
                   >
                     <X
@@ -581,6 +624,7 @@ export function TicketControls({
         {availableTags.length >
           0 && (
           <select
+            aria-label="Add existing tag"
             value=""
             disabled={
               addTagMutation
@@ -602,7 +646,7 @@ export function TicketControls({
                 }
               }
             }
-            className="mt-3 h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none"
+            className="mt-3 h-8 w-full rounded-lg border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option
               value=""
@@ -630,7 +674,7 @@ export function TicketControls({
         )}
 
         <form
-          className="mt-2 flex gap-2"
+          className="mt-2 flex min-w-0 gap-2"
           onSubmit={
             (
               event,
@@ -670,6 +714,8 @@ export function TicketControls({
                 .isPending
             }
             placeholder="New tag"
+            aria-label="New tag name"
+            className="min-w-0"
           />
 
           <Button

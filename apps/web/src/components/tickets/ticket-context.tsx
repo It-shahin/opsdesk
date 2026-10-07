@@ -38,7 +38,7 @@ export function TicketContext({
 }) {
   return (
     <aside
-      className="space-y-4"
+      className="min-w-0 space-y-4"
     >
       <section
         className="rounded-xl border bg-background p-5"
@@ -53,7 +53,7 @@ export function TicketContext({
           className="mt-4 flex items-center gap-3"
         >
           <div
-            className="flex size-10 items-center justify-center rounded-full bg-muted"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted"
           >
             <UserRound
               className="size-4"
@@ -90,14 +90,14 @@ export function TicketContext({
           {ticket.customer
             .email && (
             <div
-              className="flex items-center gap-2 text-muted-foreground"
+              className="flex min-w-0 items-center gap-2 text-muted-foreground"
             >
               <Mail
-                className="size-4"
+                className="size-4 shrink-0"
               />
 
               <span
-                className="truncate"
+                className="min-w-0 truncate"
               >
                 {
                   ticket
@@ -111,34 +111,34 @@ export function TicketContext({
           {ticket.customer
             .phone && (
             <div
-              className="flex items-center gap-2 text-muted-foreground"
+              className="flex min-w-0 items-center gap-2 text-muted-foreground"
             >
               <Phone
-                className="size-4"
+                className="size-4 shrink-0"
               />
 
-              {
-                ticket
-                  .customer
-                  .phone
-              }
+              <span
+                className="min-w-0 [overflow-wrap:anywhere]"
+              >
+                {ticket.customer.phone}
+              </span>
             </div>
           )}
 
           {ticket.customer
             .company && (
             <div
-              className="flex items-center gap-2 text-muted-foreground"
+              className="flex min-w-0 items-center gap-2 text-muted-foreground"
             >
               <Building2
-                className="size-4"
+                className="size-4 shrink-0"
               />
 
-              {
-                ticket
-                  .customer
-                  .company
-              }
+              <span
+                className="min-w-0 [overflow-wrap:anywhere]"
+              >
+                {ticket.customer.company}
+              </span>
             </div>
           )}
         </div>

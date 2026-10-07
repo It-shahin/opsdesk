@@ -1,6 +1,14 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
+  useRouter,
+} from 'next/navigation';
+
+import {
   useMutation,
   useQuery,
   useQueryClient,
@@ -66,6 +74,9 @@ export function MemberList({
   const queryClient =
     useQueryClient();
 
+  const router =
+    useRouter();
+
   const membersQuery =
     useQuery({
       queryKey: [
@@ -123,11 +134,19 @@ export function MemberList({
               }),
           ]);
 
-          /*
-           * Important if the current
-           * user's own role changed.
-           */
-          window.location.reload();
+          toast.success(
+            'Member role updated',
+          );
+
+          // Refresh server-rendered permissions after role changes.
+          router.refresh();
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
     });
 
@@ -323,7 +342,7 @@ export function MemberList({
                           }
                         }
                       }
-                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                      className="h-9 min-w-0 max-w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {allowedRoles()
                         .map(

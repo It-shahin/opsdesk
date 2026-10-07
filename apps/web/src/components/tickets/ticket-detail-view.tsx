@@ -7,8 +7,9 @@ import {
 } from 'lucide-react';
 
 import {
-  Badge,
-} from '@/components/ui/badge';
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from './ticket-badges';
 
 import {
   TicketConversation,
@@ -97,7 +98,7 @@ export function TicketDetailView({
     >
       <Link
         href={`/app/${organizationId}`}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ArrowLeft
           className="size-4"
@@ -110,32 +111,32 @@ export function TicketDetailView({
         className="flex flex-col justify-between gap-4 md:flex-row md:items-start"
       >
         <div
-          className="min-w-0"
+          className="min-w-0 flex-1"
         >
           <div
             className="flex flex-wrap items-center gap-2"
           >
             <h1
-              className="text-2xl font-semibold tracking-tight"
+              className="min-w-0 max-w-full text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]"
             >
               {ticket.subject}
             </h1>
 
-            <Badge
-              variant="outline"
-            >
-              {ticket.status}
-            </Badge>
+            <TicketStatusBadge
+              status={
+                ticket.status
+              }
+            />
 
-            <Badge
-              variant="secondary"
-            >
-              {ticket.priority}
-            </Badge>
+            <TicketPriorityBadge
+              priority={
+                ticket.priority
+              }
+            />
           </div>
 
           <p
-            className="mt-2 text-sm text-muted-foreground"
+            className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]"
           >
             {ticket.customer.name}
 
@@ -173,7 +174,7 @@ export function TicketDetailView({
               </p>
 
               <p
-                className="mt-3 whitespace-pre-wrap text-sm leading-6"
+                className="mt-3 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]"
               >
                 {ticket.description}
               </p>

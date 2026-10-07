@@ -92,17 +92,17 @@ export function ConversationMessage({
   ) {
     return (
       <article
-        className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/20"
+        className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/20"
       >
         <div
-          className="flex items-center gap-2"
+          className="flex min-w-0 flex-wrap items-center gap-2"
         >
           <LockKeyhole
-            className="size-4"
+            className="size-4 shrink-0"
           />
 
           <span
-            className="text-sm font-medium"
+            className="min-w-0 truncate text-sm font-medium"
           >
             {authorName}
           </span>
@@ -123,7 +123,7 @@ export function ConversationMessage({
         </div>
 
         <p
-          className="mt-3 whitespace-pre-wrap text-sm leading-6"
+          className="mt-3 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]"
         >
           {message.body}
         </p>
@@ -197,27 +197,29 @@ export function ConversationMessage({
       </Avatar>
 
       <div
-        className={`max-w-[80%] ${
+        className={`min-w-0 max-w-[90%] sm:max-w-[80%] ${
           customer
             ? ''
             : 'text-right'
         }`}
       >
         <div
-          className={`mb-1 flex items-center gap-2 text-xs text-muted-foreground ${
+          className={`mb-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground ${
             customer
               ? ''
               : 'justify-end'
           }`}
         >
-          <span>
+          <span
+            className="min-w-0 max-w-full truncate"
+          >
             {authorName}
           </span>
 
           {message.source ===
             'EMAIL' && (
             <Mail
-              className="size-3.5"
+              className="size-3.5 shrink-0"
             />
           )}
 
@@ -236,7 +238,7 @@ export function ConversationMessage({
           }`}
         >
           <p
-            className="whitespace-pre-wrap text-sm leading-6"
+            className="whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]"
           >
             {message.body}
           </p>

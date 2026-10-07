@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
   FormEvent,
   useState,
 } from 'react';
@@ -119,6 +123,17 @@ export function EditTicketDialog({
 
           setOpen(
             false,
+          );
+
+          toast.success(
+            'Ticket updated',
+          );
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
           );
         },
     });

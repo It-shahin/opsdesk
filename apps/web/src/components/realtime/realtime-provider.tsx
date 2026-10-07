@@ -19,6 +19,10 @@ import {
   type Socket,
 } from 'socket.io-client';
 
+import {
+  toast,
+} from 'sonner';
+
 import type {
   ClientToServerEvents,
   OrganizationJoinResult,
@@ -140,6 +144,11 @@ export function RealtimeProvider({
   const queryClient =
     useQueryClient();
 
+  const hasConnected =
+    useRef(
+      false,
+    );
+
   const socketRef =
     useRef<
       RealtimeSocket |
@@ -194,7 +203,9 @@ export function RealtimeProvider({
       string |
       null
     >(
-      null,
+      process.env.NEXT_PUBLIC_REALTIME_URL
+        ? null
+        : 'Realtime URL is not configured',
     );
 
   const joinOrganization =
@@ -564,10 +575,6 @@ export function RealtimeProvider({
       if (
         !realtimeUrl
       ) {
-        setError(
-          'Realtime URL is not configured',
-        );
-
         return;
       }
 
@@ -654,6 +661,17 @@ export function RealtimeProvider({
       socket.on(
         'realtime.ready',
         () => {
+          if (
+            hasConnected.current
+          ) {
+            toast.success(
+              'Realtime connection restored',
+            );
+          }
+
+          hasConnected.current =
+            true;
+
           setError(
             null,
           );

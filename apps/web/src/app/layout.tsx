@@ -13,6 +13,10 @@ import {
 
 import './globals.css';
 
+import {
+  Toaster,
+} from 'sonner';
+
 const geistSans =
   Geist({
     variable:
@@ -63,6 +67,11 @@ export default function RootLayout({
       >
         <AppProviders>
           {children}
+
+          <Toaster
+            position="bottom-right"
+            closeButton
+          />
         </AppProviders>
       </body>
     </html>

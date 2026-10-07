@@ -29,6 +29,11 @@ import {
 } from '@/components/ui/badge';
 
 import {
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from './ticket-badges';
+
+import {
   Button,
 } from '@/components/ui/button';
 
@@ -408,7 +413,7 @@ export function TicketInbox({
                     .value,
                 )
             }
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none"
+            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option
               value=""
@@ -450,7 +455,7 @@ export function TicketInbox({
                     .value,
                 )
             }
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none"
+            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option
               value=""
@@ -498,7 +503,7 @@ export function TicketInbox({
               membersQuery
                 .isError
             }
-            className="h-8 max-w-48 rounded-lg border border-input bg-background px-2.5 text-sm outline-none disabled:opacity-50"
+            className="h-8 max-w-48 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <option
               value=""
@@ -551,7 +556,7 @@ export function TicketInbox({
               tagsQuery
                 .isError
             }
-            className="h-8 max-w-40 rounded-lg border border-input bg-background px-2.5 text-sm outline-none disabled:opacity-50"
+            className="h-8 max-w-40 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <option
               value=""
@@ -610,7 +615,7 @@ export function TicketInbox({
                 });
               }
             }
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none"
+            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option
               value="updatedAt-desc"
@@ -775,13 +780,13 @@ export function TicketInbox({
                   ticket.id
                 }
                 href={`/app/${organizationId}/tickets/${ticket.id}`}
-                className="block border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40"
+                className="block border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
                 <div
-                  className="flex items-start justify-between gap-4"
+                  className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                 >
                   <div
-                    className="min-w-0"
+                    className="min-w-0 w-full sm:flex-1"
                   >
                     <div
                       className="flex flex-wrap items-center gap-2"
@@ -794,27 +799,25 @@ export function TicketInbox({
                         }
                       </h2>
 
-                      <Badge
-                        variant="outline"
-                      >
-                        {
+                      <TicketStatusBadge
+                        status={
                           ticket.status
                         }
-                      </Badge>
+                      />
 
-                      <Badge
-                        variant="secondary"
-                      >
-                        {
+                      <TicketPriorityBadge
+                        priority={
                           ticket.priority
                         }
-                      </Badge>
+                      />
                     </div>
 
                     <div
                       className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"
                     >
-                      <span>
+                      <span
+                        className="min-w-0 max-w-full truncate"
+                      >
                         {
                           ticket.customer
                             .name
@@ -823,7 +826,9 @@ export function TicketInbox({
 
                       {ticket.customer
                         .company && (
-                        <span>
+                        <span
+                          className="min-w-0 max-w-full truncate"
+                        >
                           {
                             ticket
                               .customer
@@ -854,11 +859,14 @@ export function TicketInbox({
                                 tag.id
                               }
                               variant="outline"
-                              className="font-normal"
+                              className="max-w-full font-normal"
                             >
-                              {
-                                tag.name
-                              }
+                              <span
+                                className="truncate"
+                                title={tag.name}
+                              >
+                                {tag.name}
+                              </span>
                             </Badge>
                           ),
                         )}
@@ -867,7 +875,7 @@ export function TicketInbox({
                   </div>
 
                   <div
-                    className="shrink-0 text-right"
+                    className="flex min-w-0 items-center justify-between gap-3 sm:block sm:shrink-0 sm:text-right"
                   >
                     <p
                       className="text-xs text-muted-foreground"
@@ -878,7 +886,7 @@ export function TicketInbox({
                     </p>
 
                     <div
-                      className="mt-2 flex items-center justify-end gap-1.5 text-xs text-muted-foreground"
+                      className="flex min-w-0 items-center justify-end gap-1.5 text-xs text-muted-foreground sm:mt-2"
                     >
                       <UserRound
                         className="size-3.5"
@@ -1000,10 +1008,10 @@ export function TicketInboxSkeleton() {
             className="space-y-3 border-b p-4 last:border-b-0"
           >
             <div
-              className="flex items-center gap-3"
+              className="flex flex-wrap items-center gap-3"
             >
               <Skeleton
-                className="h-5 w-56"
+                className="h-5 w-56 max-w-full"
               />
 
               <Skeleton
@@ -1016,7 +1024,7 @@ export function TicketInboxSkeleton() {
             </div>
 
             <Skeleton
-              className="h-4 w-72"
+              className="h-4 w-72 max-w-full"
             />
           </div>
         ),

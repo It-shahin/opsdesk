@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
   FormEvent,
   useState,
 } from 'react';
@@ -159,6 +163,17 @@ export function InviteMemberDialog({
                 organizationId,
               ],
             });
+
+          toast.success(
+            'Invitation created',
+          );
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
     });
 
@@ -277,10 +292,11 @@ export function InviteMemberDialog({
               </Label>
 
               <div
-                className="mt-2 flex gap-2"
+                className="mt-2 flex min-w-0 gap-2"
               >
                 <Input
                   id="invite-link"
+                  className="min-w-0 flex-1"
                   readOnly
                   value={
                     inviteLink
@@ -405,7 +421,7 @@ export function InviteMemberDialog({
                           OrganizationRole,
                       )
                   }
-                  className="mt-2 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                  className="mt-2 h-9 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {roles.map(
                     (

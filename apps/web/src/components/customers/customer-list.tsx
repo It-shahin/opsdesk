@@ -201,7 +201,7 @@ export function CustomerList({
     );
   }
 
-  function submitSearch(
+  function submitFilters(
     event:
       FormEvent<HTMLFormElement>,
   ) {
@@ -212,17 +212,40 @@ export function CustomerList({
         event.currentTarget,
       );
 
-    const value =
+    const searchValue =
       data.get(
         'search',
       );
 
+    const companyValue =
+      data.get(
+        'company',
+      );
+
+    const statusValue =
+      data.get(
+        'status',
+      );
+
     updateParams({
       search:
-        typeof value ===
+        typeof searchValue ===
           'string'
-          ? value.trim() ||
+          ? searchValue.trim() ||
             null
+          : null,
+
+      company:
+        typeof companyValue ===
+          'string'
+          ? companyValue.trim() ||
+            null
+          : null,
+
+      status:
+        statusValue === 'archived' ||
+        statusValue === 'all'
+          ? statusValue
           : null,
 
       page:
@@ -237,77 +260,49 @@ export function CustomerList({
     <div
       className="space-y-5"
     >
-      <div
-        className="flex flex-col gap-3 lg:flex-row"
+      <form
+        key={searchParams.toString()}
+        onSubmit={
+          submitFilters
+        }
+        className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]"
+        aria-label="Customer filters"
       >
-        <form
-          onSubmit={
-            submitSearch
-          }
-          className="relative flex-1"
+        <div
+          className="relative col-span-2 min-w-0 sm:col-span-1"
         >
           <Search
             className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           />
 
           <Input
-            key={
-              searchParams
-                .toString()
-            }
+            aria-label="Search customers"
             name="search"
             defaultValue={
               search
             }
             placeholder="Search name, email, phone or company…"
-            className="pl-9"
+            className="min-w-0 pl-9"
           />
-        </form>
+        </div>
 
         <Input
-          value={
+          aria-label="Company"
+          name="company"
+          defaultValue={
             company
           }
-          onChange={
-            (
-              event,
-            ) =>
-              updateParams({
-                company:
-                  event.target
-                    .value ||
-                  null,
-
-                page:
-                  null,
-              })
-          }
           placeholder="Company"
-          className="lg:w-52"
+          className="col-span-2 min-w-0 sm:col-span-1"
         />
 
         <select
-          value={
+          aria-label="Customer status"
+          name="status"
+          defaultValue={
             status
           }
-          onChange={
-            (
-              event,
-            ) =>
-              updateParams({
-                status:
-                  event.target
-                    .value ===
-                    'active'
-                    ? null
-                    : event.target
-                        .value,
-
-                page:
-                  null,
-              })
-          }
-          className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+          className="h-8 min-w-0 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option
             value="active"
@@ -327,7 +322,13 @@ export function CustomerList({
             All
           </option>
         </select>
-      </div>
+
+        <Button
+          type="submit"
+        >
+          Apply
+        </Button>
+      </form>
 
       <p
         className="text-sm text-muted-foreground"
@@ -402,10 +403,10 @@ export function CustomerList({
                   customer.id
                 }
                 href={`/app/${organizationId}/customers/${customer.id}`}
-                className="flex items-start justify-between gap-4 border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40"
+                className="flex min-w-0 items-start justify-between gap-4 border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
                 <div
-                  className="min-w-0"
+                  className="min-w-0 flex-1"
                 >
                   <div
                     className="flex items-center gap-2"
@@ -430,25 +431,35 @@ export function CustomerList({
                   >
                     {customer.email && (
                       <span
-                        className="inline-flex items-center gap-1"
+                        className="inline-flex min-w-0 max-w-full items-center gap-1"
                       >
                         <Mail
-                          className="size-3.5"
+                          className="size-3.5 shrink-0"
                         />
 
-                        {customer.email}
+                        <span
+                          className="min-w-0 truncate"
+                          title={customer.email}
+                        >
+                          {customer.email}
+                        </span>
                       </span>
                     )}
 
                     {customer.company && (
                       <span
-                        className="inline-flex items-center gap-1"
+                        className="inline-flex min-w-0 max-w-full items-center gap-1"
                       >
                         <Building2
-                          className="size-3.5"
+                          className="size-3.5 shrink-0"
                         />
 
-                        {customer.company}
+                        <span
+                          className="min-w-0 truncate"
+                          title={customer.company}
+                        >
+                          {customer.company}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -560,7 +571,7 @@ function CustomerListSkeleton() {
             />
 
             <Skeleton
-              className="h-4 w-72"
+              className="h-4 w-72 max-w-full"
             />
           </div>
         ),

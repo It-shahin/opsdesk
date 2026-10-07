@@ -1,6 +1,14 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
+  useRouter,
+} from 'next/navigation';
+
+import {
   useMutation,
 } from '@tanstack/react-query';
 
@@ -29,6 +37,9 @@ export function InvitationAcceptance({
   token:
     string;
 }) {
+  const router =
+    useRouter();
+
   const mutation =
     useMutation({
       mutationFn:
@@ -46,13 +57,22 @@ export function InvitationAcceptance({
               .id,
           );
 
-          /*
-           * Full navigation ensures
-           * the AppShell reloads its
-           * organization memberships.
-           */
-          window.location.assign(
+          toast.success(
+            'Invitation accepted',
+          );
+
+          router.push(
             `/app/${result.organization.id}`,
+          );
+
+          // Refresh the AppShell's organization memberships.
+          router.refresh();
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
           );
         },
     });

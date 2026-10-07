@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
   FormEvent,
   useState,
 } from 'react';
@@ -226,6 +230,12 @@ export function CustomerFormDialog({
             false,
           );
 
+          toast.success(
+            editing
+              ? 'Customer updated'
+              : 'Customer created',
+          );
+
           if (
             !editing
           ) {
@@ -233,6 +243,13 @@ export function CustomerFormDialog({
               `/app/${organizationId}/customers/${saved.id}`,
             );
           }
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
     });
 

@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  useState,
+} from 'react';
+
+import {
   useMutation,
   useQuery,
   useQueryClient,
@@ -9,7 +13,24 @@ import {
 import {
   Ban,
   Clock,
+  LoaderCircle,
 } from 'lucide-react';
+
+import {
+  toast,
+} from 'sonner';
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 import {
   Badge,
@@ -63,6 +84,16 @@ export function InvitationList({
   const queryClient =
     useQueryClient();
 
+  const [
+    selectedInvitationId,
+    setSelectedInvitationId,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
   const invitationsQuery =
     useQuery({
       queryKey: [
@@ -101,6 +132,10 @@ export function InvitationList({
 
       onSuccess:
         async () => {
+          setSelectedInvitationId(
+            null,
+          );
+
           await queryClient
             .invalidateQueries({
               queryKey: [
@@ -108,6 +143,17 @@ export function InvitationList({
                 organizationId,
               ],
             });
+
+          toast.success(
+            'Invitation canceled',
+          );
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
     });
 
@@ -214,7 +260,10 @@ export function InvitationList({
                     <div
                       className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
                     >
-                      <span>
+                      <span
+                        className="min-w-0 max-w-full truncate"
+                        title={invitation.invitedBy.name ?? invitation.invitedBy.email}
+                      >
                         Invited by{' '}
                         {invitation
                           .invitedBy
@@ -244,41 +293,92 @@ export function InvitationList({
                   </div>
 
                   {cancelable && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={
-                        cancelMutation
-                          .isPending
+                    <AlertDialog
+                      open={
+                        selectedInvitationId ===
+                          invitation.id
                       }
-                      onClick={
-                        () =>
-                          cancelMutation
-                            .mutate(
-                              invitation.id,
-                            )
+                      onOpenChange={
+                        (open) => {
+                          if (
+                            !cancelMutation.isPending
+                          ) {
+                            setSelectedInvitationId(
+                              open
+                                ? invitation.id
+                                : null,
+                            );
+                          }
+                        }
                       }
                     >
-                      <Ban
-                        className="size-4"
-                      />
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={
+                              cancelMutation.isPending
+                            }
+                          />
+                        }
+                      >
+                        <Ban
+                          className="size-4"
+                        />
 
-                      Cancel
-                    </Button>
+                        Cancel
+                      </AlertDialogTrigger>
+
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Cancel invitation?
+                          </AlertDialogTitle>
+
+                          <AlertDialogDescription>
+                            The existing invitation link will stop working immediately.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            disabled={
+                              cancelMutation.isPending
+                            }
+                          >
+                            Keep invitation
+                          </AlertDialogCancel>
+
+                          <AlertDialogAction
+                            disabled={
+                              cancelMutation.isPending
+                            }
+                            onClick={
+                              () =>
+                                cancelMutation.mutate(
+                                  invitation.id,
+                                )
+                            }
+                          >
+                            {cancelMutation.isPending && (
+                              <LoaderCircle
+                                className="size-4 animate-spin"
+                              />
+                            )}
+
+                            {cancelMutation.isPending
+                              ? 'Canceling…'
+                              : 'Cancel invitation'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </div>
               );
             },
           )
-      )}
-
-      {cancelMutation.isError && (
-        <p
-          className="border-t p-4 text-sm text-destructive"
-        >
-          {cancelMutation.error
-            .message}
-        </p>
       )}
     </div>
   );

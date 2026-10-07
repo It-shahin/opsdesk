@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  toast,
+} from 'sonner';
+
+import {
   type FormEvent,
   useId,
   useState,
@@ -107,11 +111,22 @@ export function CreateOrganizationDialog({
             '',
           );
 
+          toast.success(
+            'Workspace created',
+          );
+
           router.push(
             `/app/${organization.id}`,
           );
 
           router.refresh();
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
     });
 

@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  toast,
+} from 'sonner';
+
 import type {
   ChangeEvent,
   FormEvent,
@@ -269,6 +273,13 @@ export function TicketComposer({
               ],
             });
 
+          toast.success(
+            message.kind ===
+              'PUBLIC_REPLY'
+              ? 'Reply sent'
+              : 'Internal note added',
+          );
+
           setBody(
             '',
           );
@@ -288,6 +299,13 @@ export function TicketComposer({
               .value =
               '';
           }
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
         },
 
       onSettled:

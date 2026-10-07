@@ -11,8 +11,9 @@ import {
 import Link from 'next/link';
 
 import {
-  Badge,
-} from '@/components/ui/badge';
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from '@/components/tickets/ticket-badges';
 
 import {
   Button,
@@ -64,7 +65,7 @@ export function CustomerTicketHistory({
 
   return (
     <section
-      className="rounded-xl border bg-background"
+      className="min-w-0 overflow-hidden rounded-xl border bg-background"
     >
       <div
         className="border-b p-5"
@@ -137,13 +138,13 @@ export function CustomerTicketHistory({
                     ticket.id
                   }
                   href={`/app/${organizationId}/tickets/${ticket.id}`}
-                  className="block border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40"
+                  className="block border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <div
-                    className="flex items-start justify-between gap-4"
+                    className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                   >
                     <div
-                      className="min-w-0"
+                      className="min-w-0 w-full sm:flex-1"
                     >
                       <p
                         className="truncate font-medium"
@@ -154,21 +155,17 @@ export function CustomerTicketHistory({
                       <div
                         className="mt-2 flex flex-wrap gap-2"
                       >
-                        <Badge
-                          variant="outline"
-                        >
-                          {
+                        <TicketStatusBadge
+                          status={
                             ticket.status
                           }
-                        </Badge>
+                        />
 
-                        <Badge
-                          variant="secondary"
-                        >
-                          {
+                        <TicketPriorityBadge
+                          priority={
                             ticket.priority
                           }
-                        </Badge>
+                        />
                       </div>
                     </div>
 
@@ -191,7 +188,7 @@ export function CustomerTicketHistory({
               .totalPages >
               1 && (
             <div
-              className="flex items-center justify-between border-t p-4"
+              className="flex flex-wrap items-center justify-between gap-2 border-t p-4"
             >
               <span
                 className="text-sm text-muted-foreground"

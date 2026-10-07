@@ -1,9 +1,12 @@
 'use client';
 
+import {
+  toast,
+} from 'sonner';
+
 import Link from 'next/link';
 
 import {
-  Archive,
   ArrowLeft,
   Building2,
   Mail,
@@ -30,7 +33,10 @@ import {
 } from './customer-form-dialog';
 
 import {
-  archiveCustomer,
+  ArchiveCustomerDialog,
+} from './archive-customer-dialog';
+
+import {
   getCustomerClient,
   restoreCustomer,
 } from '@/lib/api/customers.client';
@@ -107,19 +113,6 @@ export function CustomerDetailView({
     ]);
   }
 
-  const archiveMutation =
-    useMutation({
-      mutationFn:
-        () =>
-          archiveCustomer(
-            organizationId,
-            customerId,
-          ),
-
-      onSuccess:
-        refresh,
-    });
-
   const restoreMutation =
     useMutation({
       mutationFn:
@@ -130,7 +123,20 @@ export function CustomerDetailView({
           ),
 
       onSuccess:
-        refresh,
+        async () => {
+          await refresh();
+
+          toast.success(
+            'Customer restored',
+          );
+        },
+
+      onError:
+        (error) => {
+          toast.error(
+            error.message,
+          );
+        },
     });
 
   return (
@@ -139,7 +145,7 @@ export function CustomerDetailView({
     >
       <Link
         href={`/app/${organizationId}/customers`}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ArrowLeft
           className="size-4"
@@ -151,12 +157,14 @@ export function CustomerDetailView({
       <div
         className="flex flex-col justify-between gap-4 md:flex-row md:items-start"
       >
-        <div>
+        <div
+          className="min-w-0 flex-1"
+        >
           <div
             className="flex flex-wrap items-center gap-2"
           >
             <h1
-              className="text-2xl font-semibold tracking-tight"
+              className="min-w-0 max-w-full text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]"
             >
               {customer.name}
             </h1>
@@ -172,7 +180,7 @@ export function CustomerDetailView({
 
           {customer.company && (
             <p
-              className="mt-2 text-sm text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]"
             >
               {customer.company}
             </p>
@@ -181,7 +189,7 @@ export function CustomerDetailView({
 
         {canWrite && (
           <div
-            className="flex gap-2"
+            className="flex flex-wrap gap-2"
           >
             {!customer.archivedAt && (
               <CustomerFormDialog
@@ -214,37 +222,27 @@ export function CustomerDetailView({
                 Restore
               </Button>
             ) : (
-              <Button
-                variant="outline"
-                disabled={
-                  archiveMutation
-                    .isPending
+              <ArchiveCustomerDialog
+                organizationId={
+                  organizationId
                 }
-                onClick={
-                  () =>
-                    archiveMutation
-                      .mutate()
+                customerId={
+                  customerId
                 }
-              >
-                <Archive
-                  className="size-4"
-                />
-
-                Archive
-              </Button>
+                customerName={
+                  customer.name
+                }
+              />
             )}
           </div>
         )}
       </div>
 
-      {(archiveMutation.isError ||
-        restoreMutation.isError) && (
+      {restoreMutation.isError && (
         <p
           className="text-sm text-destructive"
         >
-          {(archiveMutation.error ??
-            restoreMutation.error)
-            ?.message}
+          {restoreMutation.error.message}
         </p>
       )}
 
@@ -252,7 +250,7 @@ export function CustomerDetailView({
         className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"
       >
         <aside
-          className="space-y-4"
+          className="min-w-0 space-y-4"
         >
           <section
             className="rounded-xl border bg-background p-5"
@@ -309,7 +307,7 @@ export function CustomerDetailView({
               </h2>
 
               <p
-                className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground"
+                className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]"
               >
                 {customer.notes}
               </p>
@@ -351,7 +349,7 @@ function Info({
       />
 
       <span
-        className="min-w-0 break-words"
+        className="min-w-0 [overflow-wrap:anywhere]"
       >
         {children}
       </span>

@@ -1,13 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-
 import {
-  ContactRound,
-  Inbox,
   LogOut,
-  Settings,
-  Users,
 } from 'lucide-react';
 
 import {
@@ -49,6 +43,18 @@ import {
 import type {
   Organization,
 } from '@/lib/organizations/types';
+
+import {
+  AppNavigation,
+} from './app-navigation';
+
+import {
+  MobileNavigation,
+} from './mobile-navigation';
+
+import {
+  RealtimeStatus,
+} from '@/components/realtime/realtime-status';
 
 function getInitials(
   user:
@@ -109,11 +115,6 @@ export function AppShell({
         ? pathParts[1]
         : undefined;
 
-    const inboxHref =
-    organizationId
-        ? `/app/${organizationId}`
-        : '/app';
-
   return (
     <div
       className="min-h-screen bg-muted/20"
@@ -167,72 +168,13 @@ export function AppShell({
           </div>
 
           <nav
-            className="flex-1 space-y-1 p-3"
+            className="flex-1 p-3"
           >
-            <Link
-                href={
-                    inboxHref
+            <AppNavigation
+                organizationId={
+                organizationId
                 }
-                className="flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium"
-                >
-                <Inbox
-                    className="size-4"
-                />
-
-                Inbox
-            </Link>
-
-            <Link
-                href={
-                    organizationId
-                    ? `/app/${organizationId}/customers`
-                    : '/app'
-                }
-                className={
-                    pathname.includes(
-                    '/customers',
-                    )
-                    ? 'flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium'
-                    : 'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
-                }
-            >
-            <ContactRound
-                className="size-4"
             />
-                Customers
-            </Link>
-
-            <Link
-                href={
-                    organizationId
-                    ? `/app/${organizationId}/team`
-                    : '/app'
-                }
-                className={
-                    pathname.includes(
-                    '/team',
-                    )
-                    ? 'flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium'
-                    : 'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
-                }
-            >
-            <Users
-                className="size-4"
-            />
-
-                Team
-            </Link>
-
-            <div
-              aria-disabled="true"
-              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground"
-            >
-              <Settings
-                className="size-4"
-              />
-
-              Settings
-            </div>
           </nav>
 
           <div
@@ -246,8 +188,14 @@ export function AppShell({
           className="flex min-w-0 flex-1 flex-col"
         >
           <header
-            className="flex h-16 items-center justify-end gap-3 border-b bg-background px-4 sm:px-6"
+            className="flex min-h-16 items-center gap-2 border-b bg-background px-3 sm:px-6"
           >
+            <MobileNavigation
+              organizationId={
+                organizationId
+              }
+            />
+
             <div
               className="flex min-w-0 flex-1 items-center gap-2 lg:hidden"
             >
@@ -266,83 +214,90 @@ export function AppShell({
               />
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    className="h-auto gap-3 px-2 py-1.5"
-                  />
-                }
-              >
-                <Avatar
-                  className="size-8"
-                >
-                  {user.avatarUrl && (
-                    <AvatarImage
-                      src={
-                        user.avatarUrl
-                      }
-                      alt={
-                        user.name ??
-                        user.email
-                      }
+            <div
+              className="ml-auto flex items-center gap-2"
+            >
+              <RealtimeStatus />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label={`Account menu for ${user.name ?? user.email}`}
+                  render={
+                    <Button
+                      variant="ghost"
+                      className="h-auto gap-3 px-2 py-1.5"
                     />
-                  )}
-
-                  <AvatarFallback>
-                    {getInitials(
-                      user,
-                    )}
-                  </AvatarFallback>
-                </Avatar>
-
-                <span
-                  className="hidden text-left sm:block"
+                  }
                 >
-                  <span
-                    className="block max-w-40 truncate text-sm font-medium"
+                  <Avatar
+                    className="size-8"
                   >
-                    {user.name ??
-                      user.email}
-                  </span>
-
-                  <span
-                    className="block max-w-40 truncate text-xs text-muted-foreground"
-                  >
-                    {user.email}
-                  </span>
-                </span>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent
-                align="end"
-                className="w-56"
-              >
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>
-                    My account
-                  </DropdownMenuLabel>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    render={
-                      <a
-                        href="/auth/logout"
+                    {user.avatarUrl && (
+                      <AvatarImage
+                        src={
+                          user.avatarUrl
+                        }
+                        alt={
+                          user.name ??
+                          user.email
+                        }
                       />
-                    }
-                    className="cursor-pointer"
-                  >
-                    <LogOut
-                      className="size-4"
-                    />
+                    )}
 
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <AvatarFallback>
+                      {getInitials(
+                        user,
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <span
+                    className="hidden text-left sm:block"
+                  >
+                    <span
+                      className="block max-w-40 truncate text-sm font-medium"
+                    >
+                      {user.name ??
+                        user.email}
+                    </span>
+
+                    <span
+                      className="block max-w-40 truncate text-xs text-muted-foreground"
+                    >
+                      {user.email}
+                    </span>
+                  </span>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56"
+                >
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>
+                      My account
+                    </DropdownMenuLabel>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem
+                      render={
+                        <a
+                          href="/auth/logout"
+                        />
+                      }
+                      className="cursor-pointer"
+                    >
+                      <LogOut
+                        className="size-4"
+                      />
+
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </header>
 
           <main
