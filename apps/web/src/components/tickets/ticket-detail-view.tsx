@@ -34,6 +34,10 @@ import {
   TicketComposer,
 } from './ticket-composer';
 
+import {
+  EditTicketDialog,
+} from './edit-ticket-dialog';
+
 export function TicketDetailView({
   organizationId,
   ticketId,
@@ -127,6 +131,16 @@ export function TicketDetailView({
               ` · ${ticket.customer.company}`}
           </p>
         </div>
+        {canWrite && (
+            <EditTicketDialog
+                organizationId={
+                organizationId
+                }
+                ticket={
+                ticket
+                }
+            />
+        )}
       </div>
 
       <div
@@ -190,9 +204,15 @@ export function TicketDetailView({
         </section>
 
         <TicketContext
-          ticket={
-            ticket
-          }
+            organizationId={
+                organizationId
+            }
+            ticket={
+                ticket
+            }
+            canWrite={
+                canWrite
+            }
         />
       </div>
     </div>

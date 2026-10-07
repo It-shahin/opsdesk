@@ -411,3 +411,154 @@ export async function uploadTicketAttachment(
       .id,
   );
 }
+
+export function updateTicket(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  input: {
+    subject?:
+      string;
+
+    description?:
+      string | null;
+
+    priority?:
+      TicketPriority;
+  },
+) {
+  return apiClientFetch(
+    `/api/organizations/${organizationId}/tickets/${ticketId}`,
+    {
+      method:
+        'PATCH',
+
+      body:
+        JSON.stringify(
+          input,
+        ),
+    },
+  );
+}
+
+export function updateTicketStatus(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  status:
+    TicketStatus,
+) {
+  return apiClientFetch(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/status`,
+    {
+      method:
+        'PATCH',
+
+      body:
+        JSON.stringify({
+          status,
+        }),
+    },
+  );
+}
+
+export function updateTicketAssignee(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  membershipId:
+    string | null,
+) {
+  return apiClientFetch(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/assignee`,
+    {
+      method:
+        'PATCH',
+
+      body:
+        JSON.stringify({
+          membershipId,
+        }),
+    },
+  );
+}
+
+export function addTicketTag(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  tagId:
+    string,
+) {
+  return apiClientFetch(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/tags/${tagId}`,
+    {
+      method:
+        'POST',
+    },
+  );
+}
+
+export function removeTicketTag(
+  organizationId:
+    string,
+
+  ticketId:
+    string,
+
+  tagId:
+    string,
+) {
+  return apiClientFetch(
+    `/api/organizations/${organizationId}/tickets/${ticketId}/tags/${tagId}`,
+    {
+      method:
+        'DELETE',
+    },
+  );
+}
+
+export function createTicketTag(
+  organizationId:
+    string,
+
+  name:
+    string,
+) {
+  return apiClientFetch<{
+    id:
+      string;
+
+    name:
+      string;
+
+    createdAt:
+      string;
+
+    updatedAt:
+      string;
+  }>(
+    `/api/organizations/${organizationId}/tags`,
+    {
+      method:
+        'POST',
+
+      body:
+        JSON.stringify({
+          name,
+        }),
+    },
+  );
+}

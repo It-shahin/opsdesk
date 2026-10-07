@@ -7,16 +7,6 @@ import {
 } from 'lucide-react';
 
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/ui/avatar';
-
-import {
-  Badge,
-} from '@/components/ui/badge';
-
-import {
   Separator,
 } from '@/components/ui/separator';
 
@@ -28,16 +18,24 @@ import {
   formatTicketDate,
 } from '@/lib/tickets/format';
 
+import {
+  TicketControls,
+} from '@/lib/tickets/ticket-controls';
+
 export function TicketContext({
+  organizationId,
   ticket,
+  canWrite,
 }: {
+  organizationId:
+    string;
+
   ticket:
     TicketDetail;
-}) {
-  const assignee =
-    ticket.assignee
-      ?.user;
 
+  canWrite:
+    boolean;
+}) {
   return (
     <aside
       className="space-y-4"
@@ -158,19 +156,19 @@ export function TicketContext({
         <div
           className="mt-4 space-y-4 text-sm"
         >
-          <Detail
-            label="Status"
-            value={
-              ticket.status
+          <TicketControls
+            organizationId={
+              organizationId
+            }
+            ticket={
+              ticket
+            }
+            canWrite={
+              canWrite
             }
           />
 
-          <Detail
-            label="Priority"
-            value={
-              ticket.priority
-            }
-          />
+          <Separator />
 
           <Detail
             label="Source"
@@ -178,93 +176,6 @@ export function TicketContext({
               ticket.source
             }
           />
-
-          <Separator />
-
-          <div>
-            <p
-              className="text-xs text-muted-foreground"
-            >
-              Assignee
-            </p>
-
-            {assignee ? (
-              <div
-                className="mt-2 flex items-center gap-2"
-              >
-                <Avatar
-                  className="size-7"
-                >
-                  {assignee
-                    .avatarUrl && (
-                    <AvatarImage
-                      src={
-                        assignee
-                          .avatarUrl
-                      }
-                    />
-                  )}
-
-                  <AvatarFallback>
-                    {(assignee.name ??
-                      assignee.email)
-                      .slice(
-                        0,
-                        2,
-                      )
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-
-                <span
-                  className="truncate"
-                >
-                  {assignee.name ??
-                    assignee.email}
-                </span>
-              </div>
-            ) : (
-              <p
-                className="mt-1 text-muted-foreground"
-              >
-                Unassigned
-              </p>
-            )}
-          </div>
-
-          {ticket.tags.length >
-            0 && (
-            <>
-              <Separator />
-
-              <div>
-                <p
-                  className="text-xs text-muted-foreground"
-                >
-                  Tags
-                </p>
-
-                <div
-                  className="mt-2 flex flex-wrap gap-1.5"
-                >
-                  {ticket.tags.map(
-                    (
-                      tag,
-                    ) => (
-                      <Badge
-                        key={
-                          tag.id
-                        }
-                        variant="outline"
-                      >
-                        {tag.name}
-                      </Badge>
-                    ),
-                  )}
-                </div>
-              </div>
-            </>
-          )}
 
           <Separator />
 
