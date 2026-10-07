@@ -38,6 +38,10 @@ import {
   EditTicketDialog,
 } from './edit-ticket-dialog';
 
+import {
+  TicketRealtimeBridge,
+} from '@/components/realtime/ticket-realtime-bridge';
+
 export function TicketDetailView({
   organizationId,
   ticketId,
@@ -79,6 +83,15 @@ export function TicketDetailView({
     ticketQuery.data;
 
   return (
+    <>
+    <TicketRealtimeBridge
+        organizationId={
+        organizationId
+        }
+        ticketId={
+        ticketId
+        }
+    />
     <div
       className="mx-auto max-w-[1500px] space-y-5"
     >
@@ -216,5 +229,6 @@ export function TicketDetailView({
         />
       </div>
     </div>
+    </>
   );
 }

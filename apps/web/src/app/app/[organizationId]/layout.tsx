@@ -10,6 +10,10 @@ import {
   getOrganizationForUser,
 } from '@/lib/api/organizations.server';
 
+import {
+  OrganizationRealtimeBridge,
+} from '@/components/realtime/organization-realtime-bridge';
+
 type OrganizationLayoutProps = {
   children:
     React.ReactNode;
@@ -43,13 +47,19 @@ export default async function OrganizationLayout({
 
   return (
     <>
-      <ActiveOrganizationSync
-        organizationId={
-          organization.id
-        }
-      />
+        <ActiveOrganizationSync
+            organizationId={
+            organization.id
+            }
+        />
 
-      {children}
+        <OrganizationRealtimeBridge
+            organizationId={
+            organization.id
+            }
+        />
+
+        {children}
     </>
   );
 }

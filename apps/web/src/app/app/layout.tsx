@@ -18,6 +18,10 @@ import {
   getOrganizations,
 } from '@/lib/api/organizations.server';
 
+import {
+  RealtimeProvider,
+} from '@/components/realtime/realtime-provider';
+
 export const dynamic =
   'force-dynamic';
 
@@ -47,13 +51,15 @@ export default async function AppLayout({
   ]);
 
   return (
-    <AppShell
-        user={user}
-        organizations={
+    <RealtimeProvider>
+        <AppShell
+            user={user}
+            organizations={
             organizations
-        }
+            }
         >
-        {children}
-    </AppShell>
+            {children}
+        </AppShell>
+    </RealtimeProvider>
   );
 }
