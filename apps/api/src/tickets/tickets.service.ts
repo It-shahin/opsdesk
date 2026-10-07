@@ -440,6 +440,21 @@ export class TicketsService {
             archivedAt: true,
           },
         },
+        assignee: {
+          select: {
+            id: true,
+            role: true,
+
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
         tagLinks: {
           select: {
             tag: {
@@ -1347,6 +1362,21 @@ async createMessage(
             id: true,
           },
         });
+
+      await transaction.ticket.updateMany({
+        where: {
+          id:
+            ticket.id,
+
+          organizationId:
+            tenant.organizationId,
+        },
+
+        data: {
+          updatedAt:
+            new Date(),
+        },
+      });
 
       if (
         uniqueAttachmentIds.length >

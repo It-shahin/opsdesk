@@ -1,0 +1,60 @@
+﻿{
+    "scope":  "Isolated API and object storage fixtures; real UI, pages, server transport, and BFF handlers",
+    "sequence":  [
+                     {
+                         "method":  "POST",
+                         "path":  "/v1/organizations/22222222-2222-4222-8222-222222222222/tickets/55555555-5555-4555-8555-555555555555/attachments/init",
+                         "body":  {
+                                      "originalName":  "fixture.pdf",
+                                      "contentType":  "application/pdf",
+                                      "sizeBytes":  217
+                                  },
+                         "bytes":  78,
+                         "status":  200
+                     },
+                     {
+                         "method":  "PUT",
+                         "path":  "/objects/fcfa3d7a-25d9-4e75-9567-fcc8318a96c0",
+                         "bytes":  217,
+                         "status":  200
+                     },
+                     {
+                         "method":  "POST",
+                         "path":  "/v1/organizations/22222222-2222-4222-8222-222222222222/tickets/55555555-5555-4555-8555-555555555555/attachments/fcfa3d7a-25d9-4e75-9567-fcc8318a96c0/complete",
+                         "bytes":  0,
+                         "status":  200
+                     },
+                     {
+                         "method":  "POST",
+                         "path":  "/v1/organizations/22222222-2222-4222-8222-222222222222/tickets/55555555-5555-4555-8555-555555555555/messages",
+                         "body":  {
+                                      "kind":  "PUBLIC_REPLY",
+                                      "body":  "Fixture PDF attachment reply",
+                                      "attachmentIds":  [
+                                                            "fcfa3d7a-25d9-4e75-9567-fcc8318a96c0"
+                                                        ]
+                                  },
+                         "bytes":  118,
+                         "status":  201
+                     }
+                 ],
+    "messagePayload":  {
+                           "kind":  "PUBLIC_REPLY",
+                           "body":  "Fixture PDF attachment reply",
+                           "attachmentIds":  [
+                                                 "fcfa3d7a-25d9-4e75-9567-fcc8318a96c0"
+                                             ]
+                       },
+    "downloadedPdf":  {
+                          "matchesUpload":  true,
+                          "sha256":  "5837D4BC11376A86120CA352E41F7E6AEE05A933B58D90CE007E07BA38AA2092",
+                          "bytes":  217
+                      },
+    "blockedFiles":  [
+                         "26 MiB PDF",
+                         "11 files",
+                         "51 MiB combined",
+                         "unsupported HTML"
+                     ],
+    "invalidFileUploadRequests":  0
+}

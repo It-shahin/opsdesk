@@ -4,6 +4,7 @@ import {
   type ExecutionContext,
   type INestApplication,
   Injectable,
+  Logger,
   UnauthorizedException,
   ValidationPipe,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import {
 
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -464,6 +466,10 @@ describe(
       },
     );
 
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     beforeEach(() => {
       jest.resetAllMocks();
 
@@ -737,11 +743,11 @@ describe(
     it(
       'keeps durable email intent when queueing fails',
       async () => {
+        const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        const queueError = new Error('Redis unavailable');
         ensureEmailDeliveryQueuedMock
           .mockRejectedValue(
-            new Error(
-              'Redis unavailable',
-            ),
+            queueError,
           );
 
         await request(
@@ -762,6 +768,12 @@ describe(
               'Persist this reply.',
           })
           .expect(201);
+
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+          `Failed to queue email delivery ${DELIVERY_A}`,
+          queueError.stack,
+        );
 
         expect(
           txEmailDeliveryCreateMock,

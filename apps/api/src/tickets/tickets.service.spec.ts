@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -9,6 +10,7 @@ import {
 } from '../attachments/attachment-policy.js';
 
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -26,6 +28,10 @@ import { TicketsService } from './tickets.service.js';
 
 describe('TicketsService', () => {
   let service: TicketsService;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const customerFindFirstMock =
     jest.fn();
@@ -225,6 +231,22 @@ describe('TicketsService', () => {
 
   const customerId =
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  function expectTicketActivityUpdated() {
+    expect(transactionTicketUpdateManyMock).toHaveBeenCalledTimes(1);
+    expect(transactionTicketUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: 'ticket-1',
+        organizationId: tenant.organizationId,
+      },
+      data: {
+        updatedAt: expect.any(Date),
+      },
+    });
+    expect(txTicketMessageCreateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      transactionTicketUpdateManyMock.mock.invocationCallOrder[0],
+    );
+  }
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -1272,6 +1294,7 @@ describe('TicketsService', () => {
   expect(
     result.authorType,
   ).toBe('MEMBER');
+  expectTicketActivityUpdated();
   expect(publishMessageCreatedMock).toHaveBeenCalledWith({
     organizationId: tenant.organizationId,
     ticketId: 'ticket-1',
@@ -1339,6 +1362,7 @@ it('creates an internal note', async () => {
   });
   expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
   expect(txEmailDeliveryCreateMock).not.toHaveBeenCalled();
+  expectTicketActivityUpdated();
 });
 
 it(
@@ -1353,6 +1377,7 @@ it(
       expect(publishMessageCreatedMock).not.toHaveBeenCalled();
       expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
+      expectTicketActivityUpdated();
       order.push('commit');
       return result;
     });
@@ -1591,6 +1616,9 @@ it(
 it(
   'keeps the public reply when email enqueueing fails',
   async () => {
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const queueError = new Error('Redis unavailable');
+
     transactionTicketFindFirstMock
       .mockResolvedValue({
         id: 'ticket-1',
@@ -1617,9 +1645,7 @@ it(
 
     ensureEmailDeliveryQueuedMock
       .mockRejectedValue(
-        new Error(
-          'Redis unavailable',
-        ),
+        queueError,
       );
 
     await expect(
@@ -1638,6 +1664,57 @@ it(
     );
     expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
     expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledWith(
+      'Failed to queue email delivery email-delivery-1',
+      queueError.stack,
+    );
+  },
+);
+
+it.each(['PUBLIC_REPLY', 'INTERNAL_NOTE'] as const)(
+  'does not bump activity when creating a %s fails',
+  async (kind) => {
+    transactionTicketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+      status: 'OPEN',
+      customer: { email: 'customer@example.com' },
+    });
+    const error = new Error('Message creation failed');
+    txTicketMessageCreateMock.mockRejectedValue(error);
+
+    await expect(service.createMessage(tenant, 'ticket-1', {
+      kind,
+      body: 'Unpersisted message.',
+    })).rejects.toBe(error);
+
+    expect(transactionTicketUpdateManyMock).not.toHaveBeenCalled();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
+  },
+);
+
+it.each(['PUBLIC_REPLY', 'INTERNAL_NOTE'] as const)(
+  'does not publish or enqueue %s when the activity update fails',
+  async (kind) => {
+    transactionTicketFindFirstMock.mockResolvedValue({
+      id: 'ticket-1',
+      status: 'OPEN',
+      customer: { email: 'customer@example.com' },
+    });
+    txTicketMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+    const error = new Error('Activity update failed');
+    transactionTicketUpdateManyMock.mockRejectedValue(error);
+
+    await expect(service.createMessage(tenant, 'ticket-1', {
+      kind,
+      body: 'Saved only on commit.',
+    })).rejects.toBe(error);
+
+    expectTicketActivityUpdated();
+    expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+    expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+    expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
   },
 );
 
@@ -1698,6 +1775,7 @@ it('rejects public replies on closed tickets', async () => {
   ).not.toHaveBeenCalled();
   expect(publishMessageCreatedMock).not.toHaveBeenCalled();
   expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+  expect(transactionTicketUpdateManyMock).not.toHaveBeenCalled();
 });
 
 it('allows internal notes on closed tickets', async () => {
@@ -1729,6 +1807,7 @@ it('allows internal notes on closed tickets', async () => {
   expect(
     txTicketMessageCreateMock,
   ).toHaveBeenCalled();
+  expectTicketActivityUpdated();
 });
 
 it('does not create messages on tickets outside the tenant', async () => {
@@ -1756,6 +1835,7 @@ it('does not create messages on tickets outside the tenant', async () => {
   ).not.toHaveBeenCalled();
   expect(publishMessageCreatedMock).not.toHaveBeenCalled();
   expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+  expect(transactionTicketUpdateManyMock).not.toHaveBeenCalled();
 });
 
 it(

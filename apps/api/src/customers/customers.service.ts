@@ -272,6 +272,7 @@ async findOne(
         phone: true,
         company: true,
         notes: true,
+        archivedAt: true,
         createdAt: true,
         updatedAt: true,
       },

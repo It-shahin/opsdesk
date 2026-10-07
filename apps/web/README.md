@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Auth0 session renewal
+
+The app requests `offline_access` and renews tokens in the Next.js proxy before
+rendering protected pages. In Auth0, enable **Allow Offline Access** for the API
+identified by `AUTH0_AUDIENCE` and enable the **Refresh Token** grant for the web
+application. After changing these settings or the requested scopes, sign out and
+sign in again so the session receives a refresh token.
+
+Tokens are renewed 60 seconds before expiry. Sessions that cannot be renewed,
+or whose tokens are rejected by the API with HTTP 401, return to sign-in.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
