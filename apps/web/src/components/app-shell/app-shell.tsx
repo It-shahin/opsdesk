@@ -202,16 +202,26 @@ export function AppShell({
                 Customers
             </Link>
 
-            <div
-              aria-disabled="true"
-              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground"
+            <Link
+                href={
+                    organizationId
+                    ? `/app/${organizationId}/team`
+                    : '/app'
+                }
+                className={
+                    pathname.includes(
+                    '/team',
+                    )
+                    ? 'flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium'
+                    : 'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
+                }
             >
-              <Users
+            <Users
                 className="size-4"
-              />
+            />
 
-              Team
-            </div>
+                Team
+            </Link>
 
             <div
               aria-disabled="true"
