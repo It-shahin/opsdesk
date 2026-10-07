@@ -7,8 +7,10 @@ if (!audience) {
 }
 
 export const auth0 = new Auth0Client({
+  // Renew before expiry so the token remains valid while API requests are in flight.
+  tokenRefreshBuffer: 60,
   authorizationParameters: {
     audience,
-    scope: 'openid profile email',
+    scope: 'openid profile email offline_access',
   },
 });

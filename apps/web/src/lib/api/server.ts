@@ -1,8 +1,25 @@
 import 'server-only';
 
+import { AccessTokenError } from '@auth0/nextjs-auth0/errors';
+import { redirect } from 'next/navigation';
+import { cache } from 'react';
+
 import {
   auth0,
 } from '@/lib/auth0';
+
+// Layouts and pages can load data in parallel. Share one token lookup per render.
+const getServerAccessToken = cache(async () => {
+  try {
+    return await auth0.getAccessToken();
+  } catch (error) {
+    if (!(error instanceof AccessTokenError)) {
+      throw error;
+    }
+  }
+
+  redirect('/auth/login?returnTo=/app');
+});
 
 export class ApiServerError
   extends Error {
@@ -44,8 +61,7 @@ export async function apiServerFetch<
   const {
     token,
   } =
-    await auth0
-      .getAccessToken();
+    await getServerAccessToken();
 
   const headers =
     new Headers(
@@ -81,6 +97,11 @@ export async function apiServerFetch<
           'no-store',
       },
     );
+
+  // A rejected session is recoverable; do not render the runtime error overlay.
+  if (response.status === 401) {
+    redirect('/auth/login?returnTo=/app');
+  }
 
   if (
     response.status ===

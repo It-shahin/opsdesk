@@ -7,7 +7,7 @@ import {
 } from '@/lib/auth0';
 
 import {
-  Button,
+  buttonVariants,
 } from '@/components/ui/button';
 
 export default async function Home() {
@@ -55,28 +55,19 @@ export default async function Home() {
         <div
           className="mt-8 flex justify-center gap-3"
         >
-          <Button
-            nativeButton={false}
-            render={
-              <a
-                href="/auth/login"
-              />
-            }
+          <a
+            href="/auth/login"
+            className={buttonVariants()}
           >
             Log in
-          </Button>
+          </a>
 
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={
-              <a
-                href="/auth/login?screen_hint=signup"
-              />
-            }
+          <a
+            href="/auth/login?screen_hint=signup"
+            className={buttonVariants({ variant: 'outline' })}
           >
             Create account
-          </Button>
+          </a>
         </div>
       </div>
     </main>

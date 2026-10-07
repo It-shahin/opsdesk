@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -9,6 +10,7 @@ import {
 } from '../attachments/attachment-policy.js';
 
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
@@ -26,6 +28,10 @@ import { TicketsService } from './tickets.service.js';
 
 describe('TicketsService', () => {
   let service: TicketsService;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const customerFindFirstMock =
     jest.fn();
@@ -1610,6 +1616,9 @@ it(
 it(
   'keeps the public reply when email enqueueing fails',
   async () => {
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const queueError = new Error('Redis unavailable');
+
     transactionTicketFindFirstMock
       .mockResolvedValue({
         id: 'ticket-1',
@@ -1636,9 +1645,7 @@ it(
 
     ensureEmailDeliveryQueuedMock
       .mockRejectedValue(
-        new Error(
-          'Redis unavailable',
-        ),
+        queueError,
       );
 
     await expect(
@@ -1657,6 +1664,11 @@ it(
     );
     expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
     expect(publishEmailDeliveryUpdatedMock).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledWith(
+      'Failed to queue email delivery email-delivery-1',
+      queueError.stack,
+    );
   },
 );
 

@@ -1,10 +1,13 @@
 import {
+  afterEach,
   beforeEach,
   describe,
   expect,
   it,
   jest,
 } from '@jest/globals';
+
+import { Logger } from '@nestjs/common';
 
 import type {
   RealtimeRedisEmitterService,
@@ -17,6 +20,10 @@ import {
 describe(
   'RealtimeService',
   () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     const ORG_A =
       '22222222-2222-4222-8222-222222222222';
 
@@ -320,8 +327,10 @@ describe(
     ] as const)(
       'returns false when %s emission fails',
       (publisher) => {
+        const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        const emissionError = new Error('Socket adapter unavailable');
         emitMock.mockImplementation(() => {
-          throw new Error('Socket adapter unavailable');
+          throw emissionError;
         });
 
         expect(service[publisher]({
@@ -333,14 +342,18 @@ describe(
         })).toBe(false);
 
         expect(emitMock).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith('Failed to publish realtime event', emissionError.stack);
       },
     );
 
     it(
       'safely skips events when the Redis emitter is unavailable',
       () => {
+        const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        const emitterError = new Error('Redis emitter unavailable');
         getEmitterMock.mockImplementation(() => {
-          throw new Error('Redis emitter unavailable');
+          throw emitterError;
         });
 
         expect(
@@ -419,6 +432,8 @@ describe(
           emitMock,
         ).not.toHaveBeenCalled();
         expect(getEmitterMock).toHaveBeenCalledTimes(4);
+        expect(logError).toHaveBeenCalledTimes(4);
+        expect(logError).toHaveBeenCalledWith('Failed to publish realtime event', emitterError.stack);
       },
     );
   },

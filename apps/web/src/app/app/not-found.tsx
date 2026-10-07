@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 import {
-  Button,
+  buttonVariants,
 } from '@/components/ui/button';
 
 export default function NotFound() {
@@ -34,16 +34,12 @@ export default function NotFound() {
           it.
         </p>
 
-        <Button
-          render={
-            <Link
-              href="/app"
-            />
-          }
-          className="mt-6"
+        <Link
+          href="/app"
+          className={buttonVariants({ className: 'mt-6' })}
         >
           Return to OpsDesk
-        </Button>
+        </Link>
       </div>
     </main>
   );
