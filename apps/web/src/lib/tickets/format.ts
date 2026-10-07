@@ -1,23 +1,37 @@
+const ticketDateMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sept',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 export function formatTicketDate(
   value:
     string,
 ) {
-  return new Intl
-    .DateTimeFormat(
-      undefined,
-      {
-        dateStyle:
-          'medium',
+  const date = new Date(value);
 
-        timeStyle:
-          'short',
-      },
-    )
-    .format(
-      new Date(
-        value,
-      ),
-    );
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError('Invalid ticket timestamp');
+  }
+
+  // Fixed month names and UTC avoid locale, ICU, and timezone differences
+  // between the server render and the browser's first render.
+  const day = date.getUTCDate();
+  const month = ticketDateMonths[date.getUTCMonth()];
+  const year = date.getUTCFullYear();
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+
+  return `${day} ${month} ${year}, ${hours}:${minutes} UTC`;
 }
 
 export function formatFileSize(
