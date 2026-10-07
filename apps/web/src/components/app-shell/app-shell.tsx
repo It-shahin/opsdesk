@@ -182,16 +182,25 @@ export function AppShell({
                 Inbox
             </Link>
 
-            <div
-              aria-disabled="true"
-              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground"
+            <Link
+                href={
+                    organizationId
+                    ? `/app/${organizationId}/customers`
+                    : '/app'
+                }
+                className={
+                    pathname.includes(
+                    '/customers',
+                    )
+                    ? 'flex items-center gap-3 rounded-md bg-accent px-3 py-2 text-sm font-medium'
+                    : 'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
+                }
             >
-              <ContactRound
+            <ContactRound
                 className="size-4"
-              />
-
-              Customers
-            </div>
+            />
+                Customers
+            </Link>
 
             <div
               aria-disabled="true"

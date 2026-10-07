@@ -562,3 +562,39 @@ export function createTicketTag(
     },
   );
 }
+
+export function listCustomerTickets(
+  organizationId:
+    string,
+
+  customerId:
+    string,
+
+  page =
+    1,
+) {
+  const params =
+    new URLSearchParams({
+      page:
+        String(
+          page,
+        ),
+
+      limit:
+        '10',
+
+      customerId,
+
+      sortBy:
+        'updatedAt',
+
+      sortOrder:
+        'desc',
+    });
+
+  return apiClientFetch<
+    TicketListResponse
+  >(
+    `/api/organizations/${organizationId}/tickets?${params.toString()}`,
+  );
+}
