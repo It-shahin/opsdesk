@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { auth0 } from '@/lib/auth0';
 
@@ -41,6 +42,7 @@ export async function proxyAuthenticatedRequest(
   request: Request,
   path: string,
 ) {
+  const requestId = randomUUID();
   const originError = validateMutationOrigin(request);
   if (originError) return originError;
 
@@ -62,7 +64,10 @@ export async function proxyAuthenticatedRequest(
   }
 
   const sourceUrl = new URL(request.url);
-  const headers = new Headers({ Authorization: `Bearer ${token}` });
+  const headers = new Headers({
+    Authorization: `Bearer ${token}`,
+    'X-Request-Id': requestId,
+  });
   const contentType = request.headers.get('content-type');
   if (contentType) headers.set('Content-Type', contentType);
 
@@ -80,6 +85,10 @@ export async function proxyAuthenticatedRequest(
   });
   const responseBody = await response.text();
   const responseHeaders = new Headers(privateHeaders);
+  responseHeaders.set(
+    'X-Request-Id',
+    response.headers.get('x-request-id') ?? requestId,
+  );
   responseHeaders.set(
     'Content-Type',
     response.headers.get('content-type') ?? 'application/json',

@@ -29,23 +29,54 @@ async function bootstrap() {
         },
       );
 
+  let shuttingDown =
+    false;
+
   const shutdown =
     async (
       signal:
         string,
     ) => {
+      if (
+        shuttingDown
+      ) {
+        return;
+      }
+
+      shuttingDown =
+        true;
+
       logger.log(
-        `Received ${signal}`,
+        `Received ${signal}; shutting down worker`,
       );
 
-      await app.close();
+      try {
+        await app.close();
 
-      process.exit(
-        0,
-      );
+        logger.log(
+          'Worker shutdown completed',
+        );
+
+        process.exitCode =
+          0;
+      } catch (
+        error
+      ) {
+        logger.error(
+          'Worker shutdown failed',
+
+          error instanceof
+            Error
+            ? error.stack
+            : undefined,
+        );
+
+        process.exitCode =
+          1;
+      }
     };
 
-  process.on(
+  process.once(
     'SIGTERM',
     () =>
       void shutdown(
@@ -53,7 +84,7 @@ async function bootstrap() {
       ),
   );
 
-  process.on(
+  process.once(
     'SIGINT',
     () =>
       void shutdown(
@@ -66,4 +97,28 @@ async function bootstrap() {
   );
 }
 
-void bootstrap();
+void bootstrap()
+  .catch(
+    (
+      error:
+        unknown,
+    ) => {
+      const logger =
+        new Logger(
+          'WorkerBootstrap',
+        );
+
+      logger.error(
+        'OpsDesk worker failed to start',
+
+        error instanceof
+          Error
+          ? error.stack
+          : undefined,
+      );
+
+      process.exit(
+        1,
+      );
+    },
+  );

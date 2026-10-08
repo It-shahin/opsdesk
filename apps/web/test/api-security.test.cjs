@@ -13,6 +13,112 @@ const defaultEnv = {
   API_SERVER_URL: 'https://api.example.test',
 };
 
+test('BFF generates a fresh UUID for each upstream request and returns it when Nest omits the header', async () => {
+  const ids = [];
+  const helper = proxy({
+    fetch: async (_url, init) => {
+      const id = init.headers.get('x-request-id');
+      assert.match(
+        id,
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+      ids.push(id);
+      return new Response('{}');
+    },
+  });
+  for (let i = 0; i < 2; i++) {
+    const req = request('GET');
+    req.headers.set('x-request-id', 'browser-supplied-id');
+    const response = await helper.proxyAuthenticatedRequest(req, '/v1/tickets');
+    assert.equal(response.headers.get('x-request-id'), ids[i]);
+  }
+  assert.notEqual(ids[0], ids[1]);
+});
+
+test('BFF preserves the request ID returned by Nest on an error response', async () => {
+  const nestId = '26ce1b19-42a1-4f6a-8ec8-44669091138c';
+  const helper = proxy({
+    fetch: async () =>
+      new Response('{"message":"Conflict"}', {
+        status: 409,
+        headers: { 'x-request-id': nestId },
+      }),
+  });
+  const response = await helper.proxyAuthenticatedRequest(
+    request('POST'),
+    '/v1/tickets',
+  );
+  assert.equal(response.status, 409);
+  assert.equal(response.headers.get('x-request-id'), nestId);
+  assert.equal(response.headers.get('cache-control'), 'no-store, private');
+});
+
+test('frontend API errors retain the same request ID sent through the BFF to Nest', async () => {
+  let upstreamId;
+  const helper = proxy({
+    fetch: async (_url, init) => {
+      upstreamId = init.headers.get('x-request-id');
+      return new Response('{"message":"Ticket update failed"}', {
+        status: 500,
+        headers: { 'x-request-id': upstreamId },
+      });
+    },
+  });
+  const { apiClientFetch, ApiClientError } = load(
+    'src/lib/api/client.ts',
+    {},
+    async () =>
+      helper.proxyAuthenticatedRequest(
+        request('PATCH', appOrigin, '{}'),
+        '/v1/tickets',
+      ),
+  );
+  await assert.rejects(
+    apiClientFetch('/api/tickets', { method: 'PATCH', body: '{}' }),
+    (error) => {
+      assert.ok(error instanceof ApiClientError);
+      assert.equal(error.status, 500);
+      assert.equal(error.message, 'Ticket update failed');
+      assert.equal(error.requestId, upstreamId);
+      assert.ok(upstreamId);
+      return true;
+    },
+  );
+});
+
+test('frontend non-JSON errors retain the response request ID', async () => {
+  const id = '26ce1b19-42a1-4f6a-8ec8-44669091138c';
+  const { apiClientFetch } = load(
+    'src/lib/api/client.ts',
+    {},
+    async () =>
+      new Response('Unavailable', {
+        status: 502,
+        headers: { 'x-request-id': id },
+      }),
+  );
+  await assert.rejects(apiClientFetch('/api/tickets'), (error) => {
+    assert.equal(error.status, 502);
+    assert.equal(error.message, 'Request failed');
+    assert.equal(error.requestId, id);
+    return true;
+  });
+});
+
+test('frontend API errors default to null when no request ID is available', async () => {
+  const { apiClientFetch, ApiClientError } = load(
+    'src/lib/api/client.ts',
+    {},
+    async () => new Response('{"message":"Forbidden"}', { status: 403 }),
+  );
+  assert.equal(new ApiClientError(403, 'Forbidden').requestId, null);
+  await assert.rejects(apiClientFetch('/api/tickets'), (error) => {
+    assert.equal(error.requestId, null);
+    assert.equal(error.message, 'Forbidden');
+    return true;
+  });
+});
+
 function load(file, mocks = {}, fetch, env = defaultEnv) {
   const filename = path.join(__dirname, '..', file);
   const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
@@ -53,6 +159,7 @@ function proxy({
     'src/lib/api/proxy-request.ts',
     {
       'server-only': {},
+      'node:crypto': require('node:crypto'),
       'next/server': { NextResponse },
       '@/lib/auth0': { auth0 },
     },

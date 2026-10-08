@@ -8,15 +8,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Controller, Get } from '@nestjs/common';
-import { PrismaService } from './database/prisma.service.js';
-import { RedisService } from './redis/redis.service.js';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from './auth/public.decorator.js';
+import { HealthService } from './health/health.service.js';
 let AppController = class AppController {
-    prisma;
-    redis;
-    constructor(prisma, redis) {
-        this.prisma = prisma;
-        this.redis = redis;
+    health;
+    constructor(health) {
+        this.health = health;
     }
     getRoot() {
         return {
@@ -24,20 +22,19 @@ let AppController = class AppController {
             status: 'running',
         };
     }
-    async health() {
-        await this.prisma.$queryRaw `SELECT 1`;
-        const redis = await this.redis.ping();
-        return {
-            status: 'healthy',
-            services: {
-                database: 'connected',
-                redis: redis === 'PONG' ? 'connected' : 'unavailable',
-            },
-        };
+    live() {
+        return this.health.liveness();
+    }
+    ready() {
+        return this.health.readiness();
+    }
+    healthCheck() {
+        return this.health.readiness();
     }
 };
 __decorate([
     Public(),
+    SkipThrottle(),
     Get(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -45,15 +42,31 @@ __decorate([
 ], AppController.prototype, "getRoot", null);
 __decorate([
     Public(),
+    SkipThrottle(),
+    Get('health/live'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "live", null);
+__decorate([
+    Public(),
+    SkipThrottle(),
+    Get('health/ready'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "ready", null);
+__decorate([
+    Public(),
+    SkipThrottle(),
     Get('health'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], AppController.prototype, "health", null);
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "healthCheck", null);
 AppController = __decorate([
     Controller(),
-    __metadata("design:paramtypes", [PrismaService,
-        RedisService])
+    __metadata("design:paramtypes", [HealthService])
 ], AppController);
 export { AppController };
 //# sourceMappingURL=app.controller.js.map

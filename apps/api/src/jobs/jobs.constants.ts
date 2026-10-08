@@ -1,5 +1,9 @@
 export const QUEUE_NAMES = {
-  EMAIL: 'email',
+  EMAIL:
+    'email',
+
+  MAINTENANCE:
+    'maintenance',
 } as const;
 
 export const EMAIL_JOB_NAMES = {
@@ -11,4 +15,9 @@ export const EMAIL_JOB_NAMES = {
 
   RECOVER_PENDING:
     'email.recover-pending',
+} as const;
+
+export const MAINTENANCE_JOB_NAMES = {
+  CLEANUP_ATTACHMENTS:
+    'maintenance.cleanup-attachments',
 } as const;

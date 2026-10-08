@@ -122,7 +122,12 @@ export class EmailWorker
       'completed',
       (job) => {
         this.logger.log(
-          `Completed job ${job.id} (${job.name})`,
+          JSON.stringify({
+            event: 'email.job.completed',
+            jobId: job.id,
+            jobName: job.name,
+            attemptsMade: job.attemptsMade,
+          }),
         );
       },
     );
@@ -134,10 +139,23 @@ export class EmailWorker
         error,
       ) => {
         this.logger.error(
-          `Job ${job?.id ?? 'unknown'} failed: ${error.message}`,
+          JSON.stringify({
+            event: 'email.job.failed',
+            jobId: job?.id ?? null,
+            jobName: job?.name ?? null,
+            attemptsMade: job?.attemptsMade ?? null,
+            error: error.name,
+          }),
         );
       },
     );
+
+    this.worker.on('error', (error) => {
+      this.logger.error(JSON.stringify({
+        event: 'email.worker.error',
+        error: error.name,
+      }));
+    });
 
     this.logger.log(
       'Email worker started',
@@ -617,6 +635,10 @@ export class EmailWorker
   }
 
   private async processRecovery() {
+    let staleReset = 0;
+    let queued = 0;
+    let queueFailures = 0;
+
     const staleBefore =
       new Date(
         Date.now() -
@@ -686,6 +708,7 @@ export class EmailWorker
           });
 
       if (reset.count === 1) {
+        staleReset += 1;
         this.publishDeliveryStatus(
           delivery,
           'PENDING',
@@ -725,17 +748,26 @@ export class EmailWorker
           .ensureEmailDeliveryQueued(
             delivery.id,
           );
+        queued += 1;
       } catch {
+        queueFailures += 1;
         this.logger.error(
-          `Failed to recover email delivery ${delivery.id}`,
+          JSON.stringify({
+            event: 'email.recovery.queue_failed',
+            deliveryId: delivery.id,
+          }),
         );
       }
     }
 
-    return {
-      recovered:
-        pending.length,
+    const result = {
+      staleReset,
+      pendingFound: pending.length,
+      queued,
+      queueFailures,
     };
+    this.logger.log(JSON.stringify({ event: 'email.recovery.completed', ...result }));
+    return result;
   }
 
   async onModuleDestroy() {

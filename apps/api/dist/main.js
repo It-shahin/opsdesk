@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ConfigService } from '@nestjs/config';
@@ -22,5 +22,13 @@ async function bootstrap() {
     app.enableShutdownHooks();
     await app.listen(process.env.PORT ?? 3001);
 }
-bootstrap();
+void bootstrap()
+    .catch((error) => {
+    const logger = new Logger('Bootstrap');
+    logger.error('OpsDesk API failed to start', error instanceof
+        Error
+        ? error.stack
+        : undefined);
+    process.exit(1);
+});
 //# sourceMappingURL=main.js.map

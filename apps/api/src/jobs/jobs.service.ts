@@ -11,11 +11,16 @@ import { Queue } from 'bullmq';
 
 import { randomUUID } from 'node:crypto';
 
-import { EMAIL_JOB_NAMES, QUEUE_NAMES } from './jobs.constants.js';
-
 import { createQueueRedisConnection } from './bullmq-connection.js';
 
+import {
+  EMAIL_JOB_NAMES,
+  MAINTENANCE_JOB_NAMES,
+  QUEUE_NAMES,
+} from './jobs.constants.js';
+
 import type {
+  CleanupAttachmentsJob,
   EmailSmokeTestJob,
   RecoverEmailDeliveriesJob,
   SendTicketReplyJob,
@@ -28,6 +33,11 @@ export class JobsService implements OnModuleDestroy, OnModuleInit {
   private readonly connection;
 
   private readonly emailQueue: Queue;
+
+  private readonly maintenanceConnection;
+
+  private readonly maintenanceQueue:
+    Queue;
 
   constructor(config: ConfigService) {
     const redisUrl = config.getOrThrow<string>('REDIS_URL');
@@ -59,26 +69,102 @@ export class JobsService implements OnModuleDestroy, OnModuleInit {
         },
       },
     });
+
+    this.maintenanceConnection =
+      createQueueRedisConnection(
+        redisUrl,
+      );
+
+    this.maintenanceQueue =
+      new Queue(
+        QUEUE_NAMES.MAINTENANCE,
+        {
+          connection:
+            this.maintenanceConnection,
+
+          defaultJobOptions: {
+            attempts:
+              3,
+
+            backoff: {
+              type:
+                'exponential',
+
+              delay:
+                5_000,
+            },
+
+            removeOnComplete: {
+              age:
+                24 * 60 * 60,
+
+              count:
+                200,
+            },
+
+            removeOnFail: {
+              age:
+                7 * 24 * 60 * 60,
+
+              count:
+                500,
+            },
+          },
+        },
+      );
   }
 
   async onModuleInit() {
-    await this.emailQueue.upsertJobScheduler(
-      'recover-pending-email-deliveries',
+    await Promise.all([
+      this.emailQueue
+        .upsertJobScheduler(
+          'recover-pending-email-deliveries',
 
-      {
-        every: 60_000,
-      },
+          {
+            every:
+              60_000,
+          },
 
-      {
-        name: EMAIL_JOB_NAMES.RECOVER_PENDING,
+          {
+            name:
+              EMAIL_JOB_NAMES
+                .RECOVER_PENDING,
 
-        data: {
-          requestedAt: new Date().toISOString(),
-        } satisfies RecoverEmailDeliveriesJob,
-      },
+            data: {
+              requestedAt:
+                new Date()
+                  .toISOString(),
+            } satisfies RecoverEmailDeliveriesJob,
+          },
+        ),
+
+      this.maintenanceQueue
+        .upsertJobScheduler(
+          'cleanup-abandoned-attachments',
+
+          {
+            every:
+              15 *
+              60 *
+              1000,
+          },
+
+          {
+            name:
+              MAINTENANCE_JOB_NAMES
+                .CLEANUP_ATTACHMENTS,
+
+            data: {
+              scheduled:
+                true,
+            } satisfies CleanupAttachmentsJob,
+          },
+        ),
+    ]);
+
+    this.logger.log(
+      'Recurring job schedulers registered',
     );
-
-    this.logger.log('Email recovery scheduler registered');
   }
 
   async enqueueSmokeTest() {
@@ -148,10 +234,24 @@ export class JobsService implements OnModuleDestroy, OnModuleInit {
   }
 
   async onModuleDestroy() {
-    await this.emailQueue.close();
+    await Promise.allSettled([
+      this.emailQueue
+        .close(),
 
-    await this.connection.quit();
+      this.maintenanceQueue
+        .close(),
+    ]);
 
-    this.logger.log('BullMQ connections closed');
+    await Promise.allSettled([
+      this.connection
+        .quit(),
+
+      this.maintenanceConnection
+        .quit(),
+    ]);
+
+    this.logger.log(
+      'BullMQ connections closed',
+    );
   }
 }

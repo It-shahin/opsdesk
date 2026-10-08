@@ -25,6 +25,8 @@ import { RealtimeModule } from './realtime/realtime.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { SecurityModule } from './security/security.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
   imports: [
@@ -55,6 +57,8 @@ import { SecurityModule } from './security/security.module.js';
   AuditModule,
   AnalyticsModule,
   SecurityModule,
+  ObservabilityModule,
+  HealthModule,
 ],
   controllers: [AppController],
   providers: [AppService],

@@ -84,6 +84,11 @@ describe(
         publishEmailDeliveryUpdatedMock,
     };
 
+    const logger = {
+      log: jest.fn<(message: string) => void>(),
+      error: jest.fn<(message: string) => void>(),
+    };
+
     const worker =
       Object.assign(
         Object.create(
@@ -116,10 +121,7 @@ describe(
           realtime:
             realtime as unknown as RealtimeService,
 
-          logger: {
-            log:
-              jest.fn(),
-          },
+          logger,
         },
       );
 
@@ -689,8 +691,10 @@ describe(
         await expect(
           processRecovery(),
         ).resolves.toEqual({
-          recovered:
-            2,
+          staleReset: 2,
+          pendingFound: 2,
+          queued: 2,
+          queueFailures: 0,
         });
 
         expect(
@@ -768,7 +772,7 @@ describe(
         .mockResolvedValueOnce([]);
       deliveryUpdateManyMock.mockResolvedValueOnce({ count: 0 });
 
-      await expect(processRecovery()).resolves.toEqual({ recovered: 0 });
+      await expect(processRecovery()).resolves.toEqual({ staleReset: 0, pendingFound: 0, queued: 0, queueFailures: 0 });
 
       expect(deliveryUpdateManyMock).toHaveBeenCalledTimes(1);
       expect(deliveryUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -787,7 +791,7 @@ describe(
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: DELIVERY_ID }]);
 
-      await expect(processRecovery()).resolves.toEqual({ recovered: 1 });
+      await expect(processRecovery()).resolves.toEqual({ staleReset: 0, pendingFound: 1, queued: 1, queueFailures: 0 });
 
       expect(deliveryUpdateManyMock).not.toHaveBeenCalled();
       expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
@@ -804,6 +808,38 @@ describe(
       expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
       expect(deliveryFindManyMock).toHaveBeenCalledTimes(1);
       expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
+    });
+
+    it('reports queue failures independently and continues queueing remaining pending deliveries', async () => {
+      const ids = [DELIVERY_ID, 'pending-2', 'pending-3'];
+      deliveryFindManyMock
+        .mockResolvedValueOnce([delivery])
+        .mockResolvedValueOnce(ids.map(id => ({ id })));
+      ensureEmailDeliveryQueuedMock
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('secret recipient@example.test and message body'))
+        .mockResolvedValueOnce(undefined);
+
+      const result = { staleReset: 1, pendingFound: 3, queued: 2, queueFailures: 1 };
+      await expect(processRecovery()).resolves.toEqual(result);
+      expect(ensureEmailDeliveryQueuedMock.mock.calls).toEqual(ids.map(id => [id]));
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(logger.error.mock.calls[0]![0])).toEqual({
+        event: 'email.recovery.queue_failed', deliveryId: 'pending-2',
+      });
+      expect(JSON.parse(logger.log.mock.calls[0]![0])).toEqual({
+        event: 'email.recovery.completed', ...result,
+      });
+    });
+
+    it('reports zero work for an empty recovery run', async () => {
+      deliveryFindManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      const result = { staleReset: 0, pendingFound: 0, queued: 0, queueFailures: 0 };
+      await expect(processRecovery()).resolves.toEqual(result);
+      expect(JSON.parse(logger.log.mock.calls[0]![0])).toEqual({
+        event: 'email.recovery.completed', ...result,
+      });
+      expect(logger.error).not.toHaveBeenCalled();
     });
   },
 );
