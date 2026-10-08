@@ -211,6 +211,14 @@ export function CustomerFormDialog({
             queryClient
               .invalidateQueries({
                 queryKey: [
+                  'analytics',
+                  organizationId,
+                ],
+              }),
+
+            queryClient
+              .invalidateQueries({
+                queryKey: [
                   'customers',
                   organizationId,
                 ],

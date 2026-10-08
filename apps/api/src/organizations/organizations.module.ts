@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AuditModule } from '../audit/audit.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { OrganizationsController } from './organizations.controller.js';
 import { OrganizationsService } from './organizations.service.js';
@@ -12,8 +13,9 @@ import { RbacModule } from '../rbac/rbac.module.js';
     UsersModule,
     MembershipsModule,
     TenancyModule,
-    RbacModule
-],
+    RbacModule,
+    AuditModule,
+  ],
   controllers: [
     OrganizationsController,
   ],

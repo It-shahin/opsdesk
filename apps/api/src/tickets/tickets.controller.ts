@@ -13,6 +13,7 @@ import {
   Delete,
   Query,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import { PermissionGuard } from '../rbac/permission.guard.js';
 import { PERMISSIONS } from '../rbac/permissions.js';
@@ -336,6 +337,12 @@ async listMessages(
 }
 
 @Post(':ticketId/messages')
+@Throttle({
+  default: {
+    limit: 30,
+    ttl: minutes(1),
+  },
+})
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
 )

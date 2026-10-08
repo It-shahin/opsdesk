@@ -12,6 +12,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { AddressInfo } from 'node:net';
 import { io, type Socket as ClientSocket } from 'socket.io-client';
+import request from 'supertest';
 
 import { AccessTokenVerifierService } from '../src/auth/access-token-verifier.service.js';
 import { PermissionsService } from '../src/rbac/permissions.service.js';
@@ -136,7 +137,7 @@ describe('Realtime (e2e)', () => {
     app.useWebSocketAdapter(
       new SocketIoAdapter(
         app,
-        'http://localhost:3000',
+        'http://localhost:3000/dashboard',
         redisAdapter.getAdapter(),
       ),
     );
@@ -160,12 +161,16 @@ describe('Realtime (e2e)', () => {
     await app?.close();
   });
 
-  function createClient(token?: string): RealtimeClient {
+  function createClient(
+    token?: string,
+    origin: string | null = 'http://localhost:3000',
+  ): RealtimeClient {
     const client: RealtimeClient = io(`${baseUrl}/realtime`, {
       autoConnect: false,
       transports: ['websocket'],
       reconnection: false,
       timeout: TIMEOUT_MS,
+      extraHeaders: origin === null ? {} : { Origin: origin },
       auth: token ? { token } : {},
     });
     clients.push(client);
@@ -302,6 +307,51 @@ describe('Realtime (e2e)', () => {
     // connectClient resolves only after realtime.ready, rather than transport connect.
     const client = await connectClient('token-a');
     expect(client.connected).toBe(true);
+  });
+
+  it.each([
+    'https://evil.example',
+    'http://localhost:3000.evil.example',
+    'http://localhost:3001',
+    'null',
+    null,
+  ])(
+    'rejects a WebSocket handshake with origin %s even with a valid token',
+    async (origin) => {
+      const client = createClient('token-a', origin);
+      await connectionError(client);
+      expect(client.connected).toBe(false);
+    },
+  );
+
+  it.each([
+    { origin: 'http://localhost:3000', status: 200 },
+    { origin: 'https://evil.example', status: 403 },
+    { origin: null, status: 403 },
+  ])(
+    'returns $status for an Engine.IO polling handshake from $origin',
+    async ({ origin, status }) => {
+      const handshake = request(app!.getHttpServer())
+        .get('/socket.io/')
+        .query({ EIO: 4, transport: 'polling' });
+      if (origin !== null) handshake.set('Origin', origin);
+      await handshake.expect(status);
+    },
+  );
+
+  it('disconnects a client that exceeds the 16 KiB message limit', async () => {
+    const client = await connectClient('token-a');
+    const disconnected = waitForPayload<string>('disconnect', (listener) => {
+      client.once('disconnect', listener);
+      return () => client.off('disconnect', listener);
+    });
+    client.emit(
+      'organization.join',
+      { organizationId: 'x'.repeat(17 * 1024) },
+      () => {},
+    );
+    await disconnected;
+    expect(client.connected).toBe(false);
   });
 
   it('allows joining only organizations belonging to the authenticated user', async () => {

@@ -1,3 +1,4 @@
+import { AuditService } from '../src/audit/audit.service.js';
 import {
   BadRequestException,
   type CanActivate,
@@ -257,6 +258,7 @@ describe(
       jest.fn();
 
     const transactionClient = {
+      auditLog: { create: jest.fn() },
       ticket: {
         findFirst:
           txTicketFindFirstMock,
@@ -348,6 +350,7 @@ describe(
                 PermissionGuard,
                 TenantMembershipGuard,
                 TicketsService,
+                AuditService,
                 InboundEmailService,
                 OutboundEmailEventsService,
 

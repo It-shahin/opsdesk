@@ -10,6 +10,7 @@ import {
   jest,
 } from '@jest/globals';
 
+import type { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 import { CustomersService } from './customers.service.js';
@@ -23,12 +24,26 @@ describe('CustomersService', () => {
   const findFirstMock = jest.fn();
   const countMock = jest.fn();
   const updateMock = jest.fn();
+  const audit = {
+    record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+    recordForTenant:
+      jest.fn<
+        (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+      >(),
+  };
+  const transaction = {
+    customer: {
+      create: createMock,
+      update: updateMock,
+    },
+  };
   const transactionMock =
     jest.fn<
       (
         operations:
-          Promise<unknown>[],
-      ) => Promise<unknown[]>
+          | Promise<unknown>[]
+          | ((client: typeof transaction) => Promise<unknown>),
+      ) => Promise<unknown>
     >();
 
   const prisma = {
@@ -62,11 +77,14 @@ describe('CustomersService', () => {
 
     transactionMock.mockImplementation(
       async (operations) =>
-        Promise.all(operations),
+        typeof operations === 'function'
+          ? operations(transaction)
+          : Promise.all(operations),
     );
 
     service = new CustomersService(
       prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
     );
   });
 
@@ -127,6 +145,17 @@ describe('CustomersService', () => {
     expect(result).toEqual(
       customer,
     );
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      tenant,
+      {
+        action: 'CUSTOMER_CREATED',
+        entityType: 'CUSTOMER',
+        entityId: customer.id,
+      },
+      transaction,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transaction);
   });
 
   it('lists paginated customers only inside the tenant', async () => {
@@ -489,6 +518,17 @@ describe('CustomersService', () => {
     expect(result.archivedAt).toEqual(
       expect.any(Date),
     );
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      tenant,
+      expect.objectContaining({
+        action: 'CUSTOMER_ARCHIVED',
+        entityType: 'CUSTOMER',
+        entityId: 'customer-1',
+      }),
+      transaction,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transaction);
   });
 
   it('prevents restoring a customer when its email is now used by an active customer', async () => {
@@ -516,4 +556,93 @@ describe('CustomersService', () => {
       updateMock,
     ).not.toHaveBeenCalled();
   });
+
+  it('records update field names without customer values', async () => {
+    findFirstMock
+      .mockResolvedValueOnce({ id: 'customer-1', archivedAt: null })
+      .mockResolvedValueOnce(null);
+    updateMock.mockResolvedValue({ id: 'customer-1' });
+
+    await service.update(tenant, 'customer-1', {
+      name: 'Private name',
+      email: 'private@example.com',
+      phone: null,
+      notes: 'Private notes',
+      company: undefined,
+    });
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      tenant,
+      {
+        action: 'CUSTOMER_UPDATED',
+        entityType: 'CUSTOMER',
+        entityId: 'customer-1',
+        metadata: { changedFields: ['name', 'email', 'phone', 'notes'] },
+      },
+      transaction,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transaction);
+  });
+
+  it('records restoration of an archived customer', async () => {
+    findFirstMock.mockResolvedValue({
+      id: 'customer-1', email: null, archivedAt: new Date(),
+    });
+    const customer = { id: 'customer-1', archivedAt: null };
+    updateMock.mockResolvedValue(customer);
+
+    await expect(service.restore(tenant, 'customer-1')).resolves.toEqual(customer);
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      tenant,
+      expect.objectContaining({
+        action: 'CUSTOMER_RESTORED',
+        entityType: 'CUSTOMER',
+        entityId: customer.id,
+      }),
+      transaction,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transaction);
+  });
+
+  it.each(['archive', 'restore'] as const)(
+    'skips mutation and audit for an idempotent %s request',
+    async (method) => {
+      const customer = {
+        id: 'customer-1',
+        archivedAt: method === 'archive' ? new Date() : null,
+      };
+      findFirstMock.mockResolvedValue(customer);
+
+      await expect(service[method](tenant, customer.id)).resolves.toEqual(customer);
+      expect(transactionMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(audit.recordForTenant).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['create', 'update', 'archive', 'restore'] as const)(
+    'propagates an audit failure from the %s transaction',
+    async (method) => {
+      const customer = {
+        id: 'customer-1',
+        email: null,
+        archivedAt: method === 'restore' ? new Date() : null,
+      };
+      findFirstMock.mockResolvedValue(customer);
+      createMock.mockResolvedValue(customer);
+      updateMock.mockResolvedValue(customer);
+      const error = new Error('Audit insert failed');
+      audit.recordForTenant.mockRejectedValue(error);
+
+      const mutation = method === 'create'
+        ? service.create(tenant, { name: 'Customer' })
+        : method === 'update'
+          ? service.update(tenant, customer.id, { name: 'Updated' })
+          : service[method](tenant, customer.id);
+
+      await expect(mutation).rejects.toBe(error);
+      expect(transactionMock).toHaveBeenCalledTimes(1);
+      expect(audit.recordForTenant).toHaveBeenCalledTimes(1);
+    },
+  );
 });

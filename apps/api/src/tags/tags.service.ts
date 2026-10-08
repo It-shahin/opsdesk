@@ -3,6 +3,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 
@@ -11,6 +12,8 @@ export class TagsService {
   constructor(
     private readonly prisma:
       PrismaService,
+    private readonly audit:
+      AuditService,
   ) {}
 
   async create(
@@ -43,21 +46,35 @@ export class TagsService {
     }
 
     try {
-      return await this.prisma.tag.create({
-        data: {
-          organizationId:
-            tenant.organizationId,
+      return await this.prisma.$transaction(async (transaction) => {
+        const tag = await transaction.tag.create({
+          data: {
+            organizationId:
+              tenant.organizationId,
 
-          name,
-          normalizedName,
-        },
+            name,
+            normalizedName,
+          },
 
-        select: {
-          id: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        await this.audit.recordForTenant(
+          tenant,
+          {
+            action: 'TAG_CREATED',
+            entityType: 'TAG',
+            entityId: tag.id,
+          },
+          transaction,
+        );
+
+        return tag;
       });
     } catch (error) {
       // Protect against a race where two

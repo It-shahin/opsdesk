@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AuditModule } from '../audit/audit.module.js';
 import { RbacModule } from '../rbac/rbac.module.js';
 import { TenancyModule } from '../tenancy/tenancy.module.js';
 import { TicketsController } from './tickets.controller.js';
@@ -10,6 +11,7 @@ import { RealtimePublisherModule } from '../realtime/realtime-publisher.module.j
   imports: [
     TenancyModule,
     RbacModule,
+    AuditModule,
     RealtimePublisherModule,
   ],
 

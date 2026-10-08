@@ -97,6 +97,14 @@ export function CustomerDetailView({
       queryClient
         .invalidateQueries({
           queryKey: [
+            'analytics',
+            organizationId,
+          ],
+        }),
+
+      queryClient
+        .invalidateQueries({
+          queryKey: [
             'customer',
             organizationId,
             customerId,

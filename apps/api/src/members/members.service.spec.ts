@@ -12,11 +12,20 @@ import {
   jest,
 } from '@jest/globals';
 
+import type { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 import { MembersService } from './members.service.js';
 
 describe('MembersService', () => {
+  const audit = {
+    record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+    recordForTenant:
+      jest.fn<
+        (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+      >(),
+  };
+
   let service: MembersService;
 
   const findManyMock = jest.fn();
@@ -65,9 +74,11 @@ describe('MembersService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    audit.recordForTenant.mockReset();
 
     service = new MembersService(
       prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
     );
   });
 
@@ -134,6 +145,22 @@ describe('MembersService', () => {
       id: 'membership-agent',
       role: 'ADMIN',
     });
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      owner,
+      {
+        action: 'MEMBER_ROLE_CHANGED',
+        entityType: 'MEMBERSHIP',
+        entityId: 'membership-agent',
+        metadata: {
+          targetUserId: 'user-agent',
+          fromRole: 'AGENT',
+          toRole: 'ADMIN',
+        },
+      },
+      transactionClient,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
   });
 
   it('allows an admin to change an agent to viewer', async () => {
@@ -267,6 +294,22 @@ describe('MembersService', () => {
       id: owner.membershipId,
       role: 'ADMIN',
     });
+  });
+
+  it('skips auditing an unchanged member role', async () => {
+    findFirstMock.mockResolvedValue({ id: 'membership-agent', userId: 'user-agent', role: 'AGENT' });
+    updateMock.mockResolvedValue({ id: 'membership-agent', role: 'AGENT' });
+    await service.updateRole(owner, 'membership-agent', 'AGENT');
+    expect(audit.recordForTenant).not.toHaveBeenCalled();
+  });
+
+  it('rejects a role change when auditing fails', async () => {
+    findFirstMock.mockResolvedValue({ id: 'membership-agent', userId: 'user-agent', role: 'AGENT' });
+    updateMock.mockResolvedValue({ id: 'membership-agent', role: 'VIEWER' });
+    const error = new Error('Audit insert failed');
+    audit.recordForTenant.mockRejectedValue(error);
+    await expect(service.updateRole(owner, 'membership-agent', 'VIEWER')).rejects.toBe(error);
+    expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
   });
 
   it('returns 404 for a membership outside the tenant', async () => {

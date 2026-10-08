@@ -24,6 +24,14 @@ import {
   RealtimePublisherModule,
 } from './realtime/realtime-publisher.module.js';
 
+import {
+  AttachmentsModule,
+} from './attachments/attachments.module.js';
+
+import {
+  MaintenanceWorker,
+} from './jobs/maintenance.worker.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,8 +48,13 @@ import {
     JobsModule,
 
     RealtimePublisherModule,
+
+    AttachmentsModule,
   ],
 
-  providers: [EmailWorker],
+  providers: [
+    EmailWorker,
+    MaintenanceWorker,
+  ],
 })
 export class WorkerModule {}

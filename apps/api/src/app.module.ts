@@ -22,6 +22,11 @@ import { AttachmentsModule } from './attachments/attachments.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { InboundEmailModule } from './email/inbound-email.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { SecurityModule } from './security/security.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
   imports: [
@@ -48,7 +53,12 @@ import { RealtimeModule } from './realtime/realtime.module.js';
   AttachmentsModule,
   JobsModule,
   InboundEmailModule,
-  RealtimeModule
+  RealtimeModule,
+  AuditModule,
+  AnalyticsModule,
+  SecurityModule,
+  ObservabilityModule,
+  HealthModule,
 ],
   controllers: [AppController],
   providers: [AppService],

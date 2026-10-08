@@ -79,6 +79,41 @@ enum EmailDeliveryStatus {
   FAILED
 }
 
+enum AuditAction {
+  ORGANIZATION_CREATED
+
+  CUSTOMER_CREATED
+  CUSTOMER_UPDATED
+  CUSTOMER_ARCHIVED
+  CUSTOMER_RESTORED
+
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_STATUS_CHANGED
+  TICKET_ASSIGNEE_CHANGED
+  TICKET_TAG_ADDED
+  TICKET_TAG_REMOVED
+  TICKET_MESSAGE_CREATED
+
+  TAG_CREATED
+
+  MEMBER_ROLE_CHANGED
+
+  INVITATION_CREATED
+  INVITATION_CANCELED
+  INVITATION_ACCEPTED
+}
+
+enum AuditEntityType {
+  ORGANIZATION
+  CUSTOMER
+  TICKET
+  TICKET_MESSAGE
+  TAG
+  MEMBERSHIP
+  INVITATION
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   authProviderId      String       @unique
@@ -88,6 +123,7 @@ model User {
   memberships         Membership[]
   invitationsSent     Invitation[] @relation("InvitationInvitedBy")
   invitationsAccepted Invitation[] @relation("InvitationAcceptedBy")
+  auditLogs           AuditLog[]   @relation("AuditActorUser")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -107,6 +143,7 @@ model Organization {
   messages        TicketMessage[]
   attachments     Attachment[]
   emailDeliveries EmailDelivery[]
+  auditLogs       AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -126,6 +163,7 @@ model Membership {
   assignedTickets    Ticket[]        @relation("TicketAssignee")
   authoredMessages   TicketMessage[] @relation("TicketMessageAuthor")
   createdAttachments Attachment[]    @relation("AttachmentCreator")
+  auditLogs          AuditLog[]      @relation("AuditActorMembership")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -383,4 +421,34 @@ model EmailDelivery {
   @@index([ticketId, createdAt])
   @@index([status, createdAt])
   @@map("email_deliveries")
+}
+
+model AuditLog {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+
+  actorUserId       String? @db.Uuid
+  actorMembershipId String? @db.Uuid
+  actorRole         Role?
+
+  action     AuditAction
+  entityType AuditEntityType
+  entityId   String? @db.Uuid
+
+  metadata Json?
+
+  organization Organization @relation(fields: [organizationId],references: [id],onDelete: Cascade)
+
+  actorUser User? @relation("AuditActorUser",fields: [actorUserId],references: [id],onDelete: SetNull)
+
+  actorMembership Membership? @relation("AuditActorMembership",fields: [actorMembershipId],references: [id],onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action, createdAt])
+  @@index([organizationId, entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+
+  @@map("audit_logs")
 }

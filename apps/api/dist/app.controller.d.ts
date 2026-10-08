@@ -1,18 +1,39 @@
-import { PrismaService } from './database/prisma.service.js';
-import { RedisService } from './redis/redis.service.js';
+import { HealthService } from './health/health.service.js';
 export declare class AppController {
-    private readonly prisma;
-    private readonly redis;
-    constructor(prisma: PrismaService, redis: RedisService);
+    private readonly health;
+    constructor(health: HealthService);
     getRoot(): {
         name: string;
         status: string;
     };
-    health(): Promise<{
+    live(): {
+        status: string;
+        uptimeSeconds: number;
+    };
+    ready(): Promise<{
         status: string;
         services: {
-            database: string;
-            redis: string;
+            database: {
+                status: "up" | "down";
+                latencyMs: number;
+            };
+            redis: {
+                status: "up" | "down";
+                latencyMs: number;
+            };
+        };
+    }>;
+    healthCheck(): Promise<{
+        status: string;
+        services: {
+            database: {
+                status: "up" | "down";
+                latencyMs: number;
+            };
+            redis: {
+                status: "up" | "down";
+                latencyMs: number;
+            };
         };
     }>;
 }

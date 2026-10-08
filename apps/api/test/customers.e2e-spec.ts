@@ -19,6 +19,7 @@ import {
 } from '@jest/globals';
 import request from 'supertest';
 
+import { AuditService } from '../src/audit/audit.service.js';
 import { CustomersController } from '../src/customers/customers.controller.js';
 import { CustomersService } from '../src/customers/customers.service.js';
 import { PrismaService } from '../src/database/prisma.service.js';
@@ -118,7 +119,17 @@ describe('Customers HTTP security', () => {
   const customerFindFirstMock = jest.fn();
   const customerCountMock = jest.fn();
   const customerUpdateMock = jest.fn();
+  const auditCreateMock = jest.fn();
   const transactionMock = jest.fn();
+  const transaction = {
+    customer: {
+      create: customerCreateMock,
+      update: customerUpdateMock,
+    },
+    auditLog: {
+      create: auditCreateMock,
+    },
+  };
 
   const customerA = {
     id: CUSTOMER_A,
@@ -167,6 +178,7 @@ describe('Customers HTTP security', () => {
           PermissionGuard,
           TenantMembershipGuard,
           CustomersService,
+          AuditService,
           {
             provide: PrismaService,
             useValue: prisma,
@@ -270,8 +282,11 @@ describe('Customers HTTP security', () => {
     transactionMock.mockImplementation(
       async (
         operations:
-          Promise<unknown>[],
-      ) => Promise.all(operations),
+          | Promise<unknown>[]
+          | ((client: typeof transaction) => Promise<unknown>),
+      ) => typeof operations === 'function'
+        ? operations(transaction)
+        : Promise.all(operations),
     );
   });
 

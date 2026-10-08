@@ -9,3 +9,8 @@ export interface SendTicketReplyJob {
 export interface RecoverEmailDeliveriesJob {
   requestedAt: string;
 }
+
+export interface CleanupAttachmentsJob {
+  scheduled:
+    true;
+}

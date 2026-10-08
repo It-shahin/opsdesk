@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type {
   EmailDeliveryStatus,
@@ -60,7 +61,10 @@ export class TicketsService {
       JobsService,
 
     private readonly realtime:
-    RealtimeService,
+      RealtimeService,
+
+    private readonly audit:
+      AuditService,
   ) {}
 
   async create(
@@ -90,49 +94,69 @@ export class TicketsService {
       );
     }
 
-    const ticket =
-      await this.prisma.ticket.create({
-      data: {
-        organizationId:
-          tenant.organizationId,
+    const ticket = await this.prisma.$transaction(
+      async (transaction) => {
+        const created =
+          await transaction.ticket.create({
+            data: {
+              organizationId:
+                tenant.organizationId,
 
-        customerId:
-          customer.id,
+              customerId:
+                customer.id,
 
-        subject:
-          input.subject,
+              subject:
+                input.subject,
 
-        description:
-          input.description,
+              description:
+                input.description,
 
-        priority:
-          input.priority ??
-          'NORMAL',
+              priority:
+                input.priority ??
+                'NORMAL',
 
-        status: 'OPEN',
-        source: 'MANUAL',
-      },
+              status: 'OPEN',
+              source: 'MANUAL',
+            },
 
-      select: {
-        id: true,
-        subject: true,
-        description: true,
-        status: true,
-        priority: true,
-        source: true,
-        createdAt: true,
-        updatedAt: true,
+            select: {
+              id: true,
+              subject: true,
+              description: true,
+              status: true,
+              priority: true,
+              source: true,
+              createdAt: true,
+              updatedAt: true,
 
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            company: true,
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  company: true,
+                },
+              },
+            },
+          });
+
+        await this.audit.recordForTenant(
+          tenant,
+          {
+            action: 'TICKET_CREATED',
+            entityType: 'TICKET',
+            entityId: created.id,
+            metadata: {
+              priority: created.priority,
+              source: created.source,
+            },
           },
-        },
+          transaction,
+        );
+
+        return created;
       },
-    });
+    );
 
     this.realtime
       .publishTicketCreated({
@@ -514,6 +538,9 @@ async update(
 
       select: {
         id: true,
+        subject: true,
+        description: true,
+        priority: true,
       },
     });
 
@@ -523,57 +550,93 @@ async update(
     );
   }
 
-  const result =
-    await this.prisma.ticket.update({
-    where: {
-      id: ticket.id,
+  const changedFields: string[] = [];
+
+  if (input.subject !== undefined && input.subject !== ticket.subject) {
+    changedFields.push('subject');
+  }
+  if (input.description !== undefined && input.description !== ticket.description) {
+    changedFields.push('description');
+  }
+  if (input.priority !== undefined && input.priority !== ticket.priority) {
+    changedFields.push('priority');
+  }
+
+  const result = await this.prisma.$transaction(
+    async (transaction) => {
+      const result =
+        await transaction.ticket.update({
+          where: {
+            id: ticket.id,
+          },
+
+          data: {
+            ...(input.subject !== undefined
+              ? {
+                  subject:
+                    input.subject,
+                }
+              : {}),
+
+            ...(input.description !== undefined
+              ? {
+                  description:
+                    input.description,
+                }
+              : {}),
+
+            ...(input.priority !== undefined
+              ? {
+                  priority:
+                    input.priority,
+                }
+              : {}),
+          },
+
+          select: {
+            id: true,
+            subject: true,
+            description: true,
+            status: true,
+            priority: true,
+            source: true,
+            resolvedAt: true,
+            closedAt: true,
+            createdAt: true,
+            updatedAt: true,
+
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                company: true,
+              },
+            },
+          },
+        });
+
+      if (changedFields.length > 0) {
+        await this.audit.recordForTenant(
+          tenant,
+          {
+            action: 'TICKET_UPDATED',
+            entityType: 'TICKET',
+            entityId: result.id,
+            metadata: {
+              changedFields,
+              ...(input.priority !== undefined && input.priority !== ticket.priority
+                ? { priorityFrom: ticket.priority, priorityTo: input.priority }
+                : {}),
+            },
+          },
+          transaction,
+        );
+      }
+
+      return result;
     },
-
-    data: {
-      ...(input.subject !== undefined
-        ? {
-            subject:
-              input.subject,
-          }
-        : {}),
-
-      ...(input.description !== undefined
-        ? {
-            description:
-              input.description,
-          }
-        : {}),
-
-      ...(input.priority !== undefined
-        ? {
-            priority:
-              input.priority,
-          }
-        : {}),
-    },
-
-    select: {
-      id: true,
-      subject: true,
-      description: true,
-      status: true,
-      priority: true,
-      source: true,
-      resolvedAt: true,
-      closedAt: true,
-      createdAt: true,
-      updatedAt: true,
-
-      customer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          company: true,
-        },
-      },
-    },
-  });
+  );
 
   this.realtime
     .publishTicketUpdated({
@@ -747,6 +810,20 @@ async updateStatus(
         );
       }
 
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'TICKET_STATUS_CHANGED',
+          entityType: 'TICKET',
+          entityId: ticket.id,
+          metadata: {
+            from: ticket.status,
+            to: nextStatus,
+          },
+        },
+        transaction,
+      );
+
       return result;
     },
   );
@@ -845,6 +922,7 @@ async assign(
 
       select: {
         id: true,
+        assigneeMembershipId: true,
       },
     });
 
@@ -854,86 +932,82 @@ async assign(
     );
   }
 
-  if (membershipId === null) {
-    const result =
-      await this.prisma.ticket.update({
-      where: {
-        id: ticket.id,
-      },
+  if (membershipId !== null) {
+    const membership =
+      await this.prisma.membership.findFirst({
+        where: {
+          id: membershipId,
 
-      data: {
-        assigneeMembershipId:
-          null,
-      },
+          organizationId:
+            tenant.organizationId,
+        },
 
-      select:
-        this.assignmentSelect(),
-    });
+        select: {
+          id: true,
+          role: true,
 
-    this.realtime
-      .publishTicketUpdated({
-        organizationId:
-          tenant.organizationId,
-
-        ticketId:
-          result.id,
-      });
-
-    return result;
-  }
-
-  const membership =
-    await this.prisma.membership.findFirst({
-      where: {
-        id: membershipId,
-
-        organizationId:
-          tenant.organizationId,
-      },
-
-      select: {
-        id: true,
-        role: true,
-
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatarUrl: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
         },
-      },
-    });
+      });
 
-  if (!membership) {
-    throw new NotFoundException(
-      'Assignee not found',
-    );
+    if (!membership) {
+      throw new NotFoundException(
+        'Assignee not found',
+      );
+    }
+
+    if (
+      membership.role === 'VIEWER'
+    ) {
+      throw new BadRequestException(
+        'Viewers cannot be assigned tickets',
+      );
+    }
   }
 
-  if (
-    membership.role === 'VIEWER'
-  ) {
-    throw new BadRequestException(
-      'Viewers cannot be assigned tickets',
-    );
-  }
+  const result = await this.prisma.$transaction(
+    async (transaction) => {
+      const result =
+        await transaction.ticket.update({
+          where: {
+            id: ticket.id,
+          },
 
-  const result =
-    await this.prisma.ticket.update({
-    where: {
-      id: ticket.id,
+          data: {
+            assigneeMembershipId:
+              membershipId,
+          },
+
+          select:
+            this.assignmentSelect(),
+        });
+
+      if (ticket.assigneeMembershipId !== membershipId) {
+        await this.audit.recordForTenant(
+          tenant,
+          {
+            action: 'TICKET_ASSIGNEE_CHANGED',
+            entityType: 'TICKET',
+            entityId: ticket.id,
+            metadata: {
+              fromMembershipId: ticket.assigneeMembershipId,
+              toMembershipId: membershipId,
+            },
+          },
+          transaction,
+        );
+      }
+
+      return result;
     },
-
-    data: {
-      assigneeMembershipId:
-        membership.id,
-    },
-
-    select:
-      this.assignmentSelect(),
-  });
+  );
 
   this.realtime
     .publishTicketUpdated({
@@ -990,26 +1064,31 @@ async addTag(
     );
   }
 
-  await this.prisma.ticketTag.upsert({
-    where: {
-      ticketId_tagId: {
-        ticketId:
-          ticket.id,
-
-        tagId:
-          tag.id,
+  await this.prisma.$transaction(async (transaction) => {
+    const existingLink = await transaction.ticketTag.findUnique({
+      where: {
+        ticketId_tagId: { ticketId: ticket.id, tagId: tag.id },
       },
-    },
+    });
 
-    update: {},
+    if (!existingLink) {
+      await transaction.ticketTag.create({
+        data: { ticketId: ticket.id, tagId: tag.id },
+      });
 
-    create: {
-      ticketId:
-        ticket.id,
-
-      tagId:
-        tag.id,
-    },
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'TICKET_TAG_ADDED',
+          entityType: 'TICKET',
+          entityId: ticket.id,
+          metadata: {
+            tagId: tag.id,
+          },
+        },
+        transaction,
+      );
+    }
   });
 
   const result =
@@ -1073,14 +1152,25 @@ async removeTag(
     );
   }
 
-  await this.prisma.ticketTag.deleteMany({
-    where: {
-      ticketId:
-        ticket.id,
+  await this.prisma.$transaction(async (transaction) => {
+    const removed = await transaction.ticketTag.deleteMany({
+      where: { ticketId: ticket.id, tagId: tag.id },
+    });
 
-      tagId:
-        tag.id,
-    },
+    if (removed.count > 0) {
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'TICKET_TAG_REMOVED',
+          entityType: 'TICKET',
+          entityId: ticket.id,
+          metadata: {
+            tagId: tag.id,
+          },
+        },
+        transaction,
+      );
+    }
   });
 
   const result =
@@ -1418,6 +1508,22 @@ async createMessage(
           );
         }
       }
+
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'TICKET_MESSAGE_CREATED',
+          entityType: 'TICKET_MESSAGE',
+          entityId: createdMessage.id,
+          metadata: {
+            ticketId: ticket.id,
+            kind: input.kind,
+            source: 'MANUAL',
+            attachmentCount: uniqueAttachmentIds.length,
+          },
+        },
+        transaction,
+      );
 
       let emailDelivery:
         {

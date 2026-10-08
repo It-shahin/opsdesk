@@ -6,6 +6,8 @@ import {
   auth0,
 } from '@/lib/auth0';
 
+import { validateMutationOrigin } from '@/lib/api/proxy-request';
+
 import {
   ApiServerError,
   apiServerFetch,
@@ -23,6 +25,9 @@ export async function POST(
   request:
     Request,
 ) {
+  const originError = validateMutationOrigin(request);
+  if (originError) return originError;
+
   const session =
     await auth0
       .getSession();

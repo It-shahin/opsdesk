@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import type { Role } from '../generated/prisma/enums.js';
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 
@@ -13,6 +14,7 @@ import type { TenantContext } from '../tenancy/tenant-context.types.js';
 export class MembersService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {}
 
   async listForOrganization(
@@ -135,6 +137,23 @@ export class MembersService {
               },
             },
           });
+
+        if (target.role !== newRole) {
+          await this.audit.recordForTenant(
+            actor,
+            {
+              action: 'MEMBER_ROLE_CHANGED',
+              entityType: 'MEMBERSHIP',
+              entityId: target.id,
+              metadata: {
+                targetUserId: target.userId,
+                fromRole: target.role,
+                toRole: newRole,
+              },
+            },
+            transaction,
+          );
+        }
 
         return updated;
       },

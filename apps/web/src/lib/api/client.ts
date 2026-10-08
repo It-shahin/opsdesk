@@ -6,6 +6,9 @@ export class ApiClientError
 
     message:
       string,
+
+    public readonly requestId:
+      string | null = null,
   ) {
     super(
       message,
@@ -126,6 +129,7 @@ export async function apiClientFetch<
     throw new ApiClientError(
       response.status,
       message,
+      response.headers.get('x-request-id'),
     );
   }
 

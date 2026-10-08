@@ -11,6 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import { PermissionGuard } from '../rbac/permission.guard.js';
 import { PERMISSIONS } from '../rbac/permissions.js';
@@ -37,6 +38,13 @@ export class InvitationsController {
   ) {}
 
   @Post()
+  @Throttle({
+    default: {
+      limit: 30,
+      ttl: minutes(10),
+      blockDuration: minutes(10),
+    },
+  })
   async create(
     @Req()
     request: TenantAuthenticatedRequest,

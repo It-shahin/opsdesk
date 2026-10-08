@@ -38,9 +38,14 @@ import {
   RealtimePublisherModule,
 } from '../realtime/realtime-publisher.module.js';
 
+import {
+  AuditModule,
+} from '../audit/audit.module.js';
+
 @Module({
   imports: [
     RealtimePublisherModule,
+    AuditModule,
   ],
   
   controllers: [

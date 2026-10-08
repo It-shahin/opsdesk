@@ -12,6 +12,7 @@ import {
 } from '@jest/globals';
 import { createHash } from 'node:crypto';
 
+import type { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Role } from '../generated/prisma/enums.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
@@ -60,6 +61,14 @@ type MembershipRecord = {
 };
 
 describe('InvitationsService', () => {
+  const audit = {
+    record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+    recordForTenant:
+      jest.fn<
+        (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+      >(),
+  };
+
   let service: InvitationsService;
 
   const userFindUniqueMock =
@@ -129,6 +138,7 @@ describe('InvitationsService', () => {
       findUnique:
         invitationFindUniqueMock,
       create: createMock,
+      update: updateMock,
       updateMany:
         invitationUpdateManyMock,
     },
@@ -143,7 +153,7 @@ describe('InvitationsService', () => {
     jest.fn<
       (
         callback: TransactionCallback,
-        options: unknown,
+        options?: unknown,
       ) => Promise<unknown>
     >();
 
@@ -228,6 +238,7 @@ describe('InvitationsService', () => {
 
     service = new InvitationsService(
       prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
     );
   });
 
@@ -313,6 +324,18 @@ describe('InvitationsService', () => {
       acceptanceToken:
         expect.any(String),
     });
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      owner,
+      {
+        action: 'INVITATION_CREATED',
+        entityType: 'INVITATION',
+        entityId: invitation.id,
+        metadata: { role: 'AGENT' },
+      },
+      transactionClient,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
 
     expect(
       transactionMock,
@@ -585,6 +608,38 @@ describe('InvitationsService', () => {
       ...canceledInvitation,
       status: 'CANCELED',
     });
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      owner,
+      {
+        action: 'INVITATION_CANCELED',
+        entityType: 'INVITATION',
+        entityId: invitation.id,
+        metadata: { role: 'AGENT' },
+      },
+      transactionClient,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
+  });
+
+  it('skips auditing an already canceled invitation', async () => {
+    findFirstMock.mockResolvedValue({ ...invitation, canceledAt: new Date() });
+    await service.cancel(owner, invitation.id);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(audit.recordForTenant).not.toHaveBeenCalled();
+  });
+
+  it.each(['create', 'cancel'] as const)('rejects invitation %s when auditing fails', async (operation) => {
+    createMock.mockResolvedValue(invitation);
+    findFirstMock.mockResolvedValue(invitation);
+    updateMock.mockResolvedValue({ ...invitation, canceledAt: new Date() });
+    const error = new Error('Audit insert failed');
+    audit.recordForTenant.mockRejectedValue(error);
+    const mutation = operation === 'create'
+      ? service.create(owner, invitation.email, 'AGENT')
+      : service.cancel(owner, invitation.id);
+    await expect(mutation).rejects.toBe(error);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 
   describe('accept', () => {
@@ -700,6 +755,32 @@ describe('InvitationsService', () => {
             expect.any(Date),
         },
       });
+
+      expect(audit.record).toHaveBeenCalledWith(
+        {
+          organizationId: owner.organizationId,
+          actorUserId: invitedUser.id,
+          actorMembershipId: 'new-membership',
+          actorRole: 'AGENT',
+          action: 'INVITATION_ACCEPTED',
+          entityType: 'INVITATION',
+          entityId: invitation.id,
+          metadata: { membershipId: 'new-membership', role: 'AGENT' },
+        },
+        transactionClient,
+      );
+      expect(audit.record.mock.calls.at(-1)?.[1]).toBe(transactionClient);
+    });
+
+    it('rejects acceptance when auditing the new membership fails', async () => {
+      invitationFindUniqueMock.mockResolvedValue(pendingInvitation());
+      membershipCreateMock.mockResolvedValue({
+        id: 'new-membership', role: 'AGENT', createdAt: new Date(), organization,
+      });
+      const error = new Error('Audit insert failed');
+      audit.record.mockRejectedValue(error);
+      await expect(service.accept(invitedUser, rawToken)).rejects.toBe(error);
+      expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable' });
     });
 
     it('rejects the wrong authenticated email', async () => {
