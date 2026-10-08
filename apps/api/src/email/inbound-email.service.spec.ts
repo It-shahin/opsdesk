@@ -1,3 +1,4 @@
+import type { AuditService } from '../audit/audit.service.js';
 import {
   ConfigService,
 } from '@nestjs/config';
@@ -66,6 +67,14 @@ describe(
 
     const txWebhookEventCreateMock =
       jest.fn();
+
+    const audit = {
+      record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+      recordForTenant:
+        jest.fn<
+          (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+        >(),
+    };
 
     const transactionClient = {
       ticketMessage: {
@@ -173,6 +182,7 @@ describe(
           provider as unknown as InboundEmailProviderService,
           realtime as unknown as RealtimeService,
           config as unknown as ConfigService,
+          audit as unknown as AuditService,
         );
     });
 
@@ -402,6 +412,38 @@ describe(
             'message-1',
         });
         expect(txMessageCreateMock).toHaveBeenCalledTimes(1);
+        expect(audit.record).toHaveBeenCalledTimes(reopenedCount === 1 ? 2 : 1);
+        expect(audit.record).toHaveBeenNthCalledWith(
+          1,
+          {
+            organizationId: ORG_ID,
+            action: 'TICKET_MESSAGE_CREATED',
+            entityType: 'TICKET_MESSAGE',
+            entityId: 'message-1',
+            metadata: {
+              ticketId: TICKET_ID,
+              kind: 'PUBLIC_REPLY',
+              source: 'EMAIL',
+              authorType: 'CUSTOMER',
+            },
+          },
+          transactionClient,
+        );
+        expect(audit.record.mock.calls[0]?.[1]).toBe(transactionClient);
+        if (reopenedCount === 1) {
+          expect(audit.record).toHaveBeenNthCalledWith(
+            2,
+            {
+              organizationId: ORG_ID,
+              action: 'TICKET_STATUS_CHANGED',
+              entityType: 'TICKET',
+              entityId: TICKET_ID,
+              metadata: { to: 'OPEN', reason: 'CUSTOMER_REPLY' },
+            },
+            transactionClient,
+          );
+          expect(audit.record.mock.calls[1]?.[1]).toBe(transactionClient);
+        }
         expect(publishMessageCreatedMock).toHaveBeenCalledTimes(1);
         expect(publishMessageCreatedMock).toHaveBeenCalledWith({
           organizationId: ORG_ID,
@@ -422,7 +464,7 @@ describe(
       },
     );
 
-    it.each(['message', 'activity'] as const)(
+    it.each(['message', 'activity', 'message audit', 'reopen audit'] as const)(
       'does not publish inbound events when the %s write fails',
       async (failedWrite) => {
         const recipients = [`ticket-${TICKET_ID}@abc.resend.app`];
@@ -438,11 +480,16 @@ describe(
           customer: { email: 'jane@example.com' },
         });
         txMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+        txTicketUpdateManyMock.mockResolvedValue({ count: 1 });
         const error = new Error('Write failed');
         if (failedWrite === 'message') {
           txMessageCreateMock.mockRejectedValue(error);
-        } else {
+        } else if (failedWrite === 'activity') {
           txTicketUpdateManyMock.mockRejectedValue(error);
+        } else if (failedWrite === 'message audit') {
+          audit.record.mockRejectedValue(error);
+        } else {
+          audit.record.mockResolvedValueOnce({ id: 'audit-1', createdAt: new Date() }).mockRejectedValueOnce(error);
         }
 
         await expect(service.handleReceivedEmail({
@@ -456,7 +503,8 @@ describe(
         })).rejects.toBe(error);
 
         expect(txTicketUpdateManyMock).toHaveBeenCalledTimes(
-          failedWrite === 'message' ? 0 : 1,
+          failedWrite === 'message' || failedWrite === 'message audit' ? 0
+            : failedWrite === 'activity' ? 1 : 2,
         );
         expect(publishMessageCreatedMock).not.toHaveBeenCalled();
         expect(publishTicketUpdatedMock).not.toHaveBeenCalled();

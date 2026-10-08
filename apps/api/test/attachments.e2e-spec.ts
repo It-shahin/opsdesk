@@ -1,3 +1,4 @@
+import { AuditService } from '../src/audit/audit.service.js';
 import {
   type CanActivate,
   type ExecutionContext,
@@ -109,6 +110,7 @@ describe('Attachment HTTP security', () => {
   const ensureEmailDeliveryQueuedMock = jest.fn();
 
   const transactionClient = {
+    auditLog: { create: jest.fn() },
     ticket: {
       findFirst: txTicketFindFirstMock,
       updateMany: txTicketUpdateManyMock,
@@ -214,6 +216,7 @@ describe('Attachment HTTP security', () => {
         TenantMembershipGuard,
         AttachmentsService,
         TicketsService,
+        AuditService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JobsService,

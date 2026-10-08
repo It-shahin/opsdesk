@@ -22,6 +22,7 @@ import { AttachmentsModule } from './attachments/attachments.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { InboundEmailModule } from './email/inbound-email.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
+import { AuditModule } from './audit/audit.module.js';
 
 @Module({
   imports: [
@@ -48,7 +49,8 @@ import { RealtimeModule } from './realtime/realtime.module.js';
   AttachmentsModule,
   JobsModule,
   InboundEmailModule,
-  RealtimeModule
+  RealtimeModule,
+  AuditModule,
 ],
   controllers: [AppController],
   providers: [AppService],

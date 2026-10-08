@@ -9,6 +9,7 @@ import {
   randomBytes,
 } from 'node:crypto';
 
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Role } from '../generated/prisma/enums.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
@@ -20,6 +21,7 @@ const INVITATION_LIFETIME_MS =
 export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(
@@ -117,7 +119,7 @@ export class InvitationsService {
             );
           }
 
-          return transaction.invitation.create({
+          const invitation = await transaction.invitation.create({
             data: {
               organizationId:
                 actor.organizationId,
@@ -154,6 +156,21 @@ export class InvitationsService {
               },
             },
           });
+
+          await this.audit.recordForTenant(
+            actor,
+            {
+              action: 'INVITATION_CREATED',
+              entityType: 'INVITATION',
+              entityId: invitation.id,
+              metadata: {
+                role,
+              },
+            },
+            transaction,
+          );
+
+          return invitation;
         },
         {
           isolationLevel:
@@ -277,40 +294,55 @@ export class InvitationsService {
       );
     }
 
-    const canceled =
-      await this.prisma.invitation.update({
-        where: {
-          id: invitation.id,
-        },
+    return this.prisma.$transaction(async (transaction) => {
+      const canceled =
+        await transaction.invitation.update({
+          where: {
+            id: invitation.id,
+          },
 
-        data: {
-          canceledAt:
-            new Date(),
-        },
+          data: {
+            canceledAt:
+              new Date(),
+          },
 
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          expiresAt: true,
-          acceptedAt: true,
-          canceledAt: true,
-          createdAt: true,
-          updatedAt: true,
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            expiresAt: true,
+            acceptedAt: true,
+            canceledAt: true,
+            createdAt: true,
+            updatedAt: true,
 
-          invitedBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+            invitedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
             },
           },
-        },
-      });
+        });
 
-    return this.toResponse(
-      canceled,
-    );
+      await this.audit.recordForTenant(
+        actor,
+        {
+          action: 'INVITATION_CANCELED',
+          entityType: 'INVITATION',
+          entityId: canceled.id,
+          metadata: {
+            role: canceled.role,
+          },
+        },
+        transaction,
+      );
+
+      return this.toResponse(
+        canceled,
+      );
+    });
   }
 
   async accept(
@@ -459,6 +491,23 @@ export class InvitationsService {
             },
           },
         });
+
+      await this.audit.record(
+        {
+          organizationId: invitation.organizationId,
+          actorUserId: user.id,
+          actorMembershipId: membership.id,
+          actorRole: invitation.role,
+          action: 'INVITATION_ACCEPTED',
+          entityType: 'INVITATION',
+          entityId: invitation.id,
+          metadata: {
+            membershipId: membership.id,
+            role: invitation.role,
+          },
+        },
+        transaction,
+      );
 
       return {
         membership: {

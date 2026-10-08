@@ -1,3 +1,4 @@
+import { AuditService } from '../audit/audit.service.js';
 import {
   Injectable,
   Logger,
@@ -148,6 +149,9 @@ export class InboundEmailService {
 
     config:
       ConfigService,
+
+    private readonly audit:
+      AuditService,
   ) {
     this.inboundDomain =
       config.getOrThrow<string>(
@@ -388,6 +392,22 @@ export class InboundEmailService {
                     },
                   });
 
+              await this.audit.record(
+                {
+                  organizationId: ticket.organizationId,
+                  action: 'TICKET_MESSAGE_CREATED',
+                  entityType: 'TICKET_MESSAGE',
+                  entityId: created.id,
+                  metadata: {
+                    ticketId: ticket.id,
+                    kind: 'PUBLIC_REPLY',
+                    source: 'EMAIL',
+                    authorType: 'CUSTOMER',
+                  },
+                },
+                transaction,
+              );
+
               await transaction
                 .ticket
                 .updateMany({
@@ -441,6 +461,22 @@ export class InboundEmailService {
                       null,
                   },
                 });
+
+              if (reopened.count === 1) {
+                await this.audit.record(
+                  {
+                    organizationId: ticket.organizationId,
+                    action: 'TICKET_STATUS_CHANGED',
+                    entityType: 'TICKET',
+                    entityId: ticket.id,
+                    metadata: {
+                      to: 'OPEN',
+                      reason: 'CUSTOMER_REPLY',
+                    },
+                  },
+                  transaction,
+                );
+              }
 
               return {
                 message:

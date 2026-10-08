@@ -18,6 +18,7 @@ import {
   jest,
 } from '@jest/globals';
 
+import type { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import {
   JobsService,
@@ -27,6 +28,14 @@ import type { RealtimeService } from '../realtime/realtime.service.js';
 import { TicketsService } from './tickets.service.js';
 
 describe('TicketsService', () => {
+  const audit = {
+    record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+    recordForTenant:
+      jest.fn<
+        (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+      >(),
+  };
+
   let service: TicketsService;
 
   afterEach(() => {
@@ -97,7 +106,9 @@ describe('TicketsService', () => {
   const tagFindFirstMock =
     jest.fn();
 
-  const ticketTagUpsertMock =
+  const ticketTagFindUniqueMock = jest.fn();
+
+  const ticketTagCreateMock =
     jest.fn();
 
   const ticketTagDeleteManyMock =
@@ -110,7 +121,14 @@ describe('TicketsService', () => {
       jest.fn();
 
   const transactionClient = {
+    ticketTag: {
+      findUnique: ticketTagFindUniqueMock,
+      create: ticketTagCreateMock,
+      deleteMany: ticketTagDeleteManyMock,
+    },
     ticket: {
+      create: ticketCreateMock,
+      update: ticketUpdateMock,
       findFirst:
         transactionTicketFindFirstMock,
 
@@ -197,8 +215,8 @@ describe('TicketsService', () => {
     },
 
     ticketTag: {
-      upsert:
-        ticketTagUpsertMock,
+      create:
+        ticketTagCreateMock,
 
       deleteMany:
         ticketTagDeleteManyMock,
@@ -289,7 +307,185 @@ describe('TicketsService', () => {
             ensureEmailDeliveryQueuedMock,
         } as unknown as JobsService,
         realtime as unknown as RealtimeService,
+        audit as unknown as AuditService,
       );
+  });
+
+  describe('audit events', () => {
+    const ticket = {
+      id: 'ticket-1',
+      subject: 'Private subject',
+      description: 'Private description',
+      priority: 'NORMAL',
+      source: 'MANUAL',
+      status: 'OPEN',
+      assigneeMembershipId: null,
+      customer: { email: 'private@example.com' },
+      tagLinks: [],
+    };
+
+    beforeEach(() => {
+      customerFindFirstMock.mockResolvedValue({ id: customerId });
+      ticketFindFirstMock.mockResolvedValue(ticket);
+      transactionTicketFindFirstMock.mockResolvedValue(ticket);
+      ticketCreateMock.mockResolvedValue(ticket);
+      ticketUpdateMock.mockResolvedValue(ticket);
+      transactionTicketUpdateManyMock.mockResolvedValue({ count: 1 });
+      membershipFindFirstMock.mockResolvedValue({ id: 'member-2', role: 'AGENT' });
+      tagFindFirstMock.mockResolvedValue({ id: 'tag-1' });
+      ticketTagFindUniqueMock.mockResolvedValue(null);
+      ticketTagDeleteManyMock.mockResolvedValue({ count: 1 });
+      txTicketMessageCreateMock.mockResolvedValue({ id: 'message-1' });
+      txAttachmentFindManyMock.mockResolvedValue([
+        { id: 'attachment-1', sizeBytes: 10 },
+        { id: 'attachment-2', sizeBytes: 20 },
+      ]);
+      txAttachmentUpdateManyMock.mockResolvedValue({ count: 2 });
+    });
+
+    const mutations = [
+      {
+        action: 'TICKET_CREATED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: { priority: 'NORMAL', source: 'MANUAL' },
+        run: () => service.create(tenant, {
+          customerId, subject: ticket.subject, description: ticket.description,
+        }),
+      },
+      {
+        action: 'TICKET_UPDATED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: {
+          changedFields: ['subject', 'description', 'priority'],
+          priorityFrom: 'NORMAL', priorityTo: 'HIGH',
+        },
+        run: () => service.update(tenant, 'ticket-1', {
+          subject: 'Another private subject', description: null, priority: 'HIGH',
+        }),
+      },
+      {
+        action: 'TICKET_STATUS_CHANGED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: { from: 'OPEN', to: 'PENDING' },
+        run: () => service.updateStatus(tenant, 'ticket-1', 'PENDING'),
+      },
+      {
+        action: 'TICKET_ASSIGNEE_CHANGED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: { fromMembershipId: null, toMembershipId: 'member-2' },
+        run: () => service.assign(tenant, 'ticket-1', 'member-2'),
+      },
+      {
+        action: 'TICKET_TAG_ADDED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: { tagId: 'tag-1' },
+        run: () => service.addTag(tenant, 'ticket-1', 'tag-1'),
+      },
+      {
+        action: 'TICKET_TAG_REMOVED',
+        entityType: 'TICKET', entityId: 'ticket-1',
+        metadata: { tagId: 'tag-1' },
+        run: () => service.removeTag(tenant, 'ticket-1', 'tag-1'),
+      },
+      {
+        action: 'TICKET_MESSAGE_CREATED',
+        entityType: 'TICKET_MESSAGE', entityId: 'message-1',
+        metadata: {
+          ticketId: 'ticket-1', kind: 'PUBLIC_REPLY', source: 'MANUAL', attachmentCount: 2,
+        },
+        run: () => service.createMessage(tenant, 'ticket-1', {
+          kind: 'PUBLIC_REPLY', body: 'Private reply',
+          attachmentIds: ['attachment-1', 'attachment-2'],
+        }),
+      },
+    ];
+
+    function expectNoPublication() {
+      expect(publishTicketCreatedMock).not.toHaveBeenCalled();
+      expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
+      expect(publishMessageCreatedMock).not.toHaveBeenCalled();
+      expect(publishEmailDeliveryUpdatedMock).not.toHaveBeenCalled();
+      expect(ensureEmailDeliveryQueuedMock).not.toHaveBeenCalled();
+    }
+
+    it.each(mutations)('records $action before commit with only permitted metadata', async (mutation) => {
+      transactionMock.mockImplementationOnce(async (input) => {
+        if (Array.isArray(input)) throw new Error('Expected an interactive transaction');
+        const result = await input(transactionClient);
+        expectNoPublication();
+        expect(audit.recordForTenant).toHaveBeenCalledTimes(1);
+        expect(audit.recordForTenant).toHaveBeenCalledWith(
+          tenant,
+          {
+            action: mutation.action,
+            entityType: mutation.entityType,
+            entityId: mutation.entityId,
+            metadata: mutation.metadata,
+          },
+          transactionClient,
+        );
+        expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
+        return result;
+      });
+
+      await mutation.run();
+      expect(transactionMock).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(mutations)('rejects $action without publication when auditing fails', async (mutation) => {
+      const error = new Error('Audit insert failed');
+      audit.recordForTenant.mockRejectedValue(error);
+
+      await expect(mutation.run()).rejects.toBe(error);
+      expectNoPublication();
+    });
+
+    it('records only changed fields when the priority stays the same', async () => {
+      await service.update(tenant, 'ticket-1', {
+        subject: 'Changed', description: ticket.description, priority: 'NORMAL',
+      });
+      expect(audit.recordForTenant).toHaveBeenCalledWith(
+        tenant,
+        expect.objectContaining({ metadata: { changedFields: ['subject'] } }),
+        transactionClient,
+      );
+      expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
+    });
+
+    it('skips auditing when ticket edit values are unchanged', async () => {
+      await service.update(tenant, 'ticket-1', {
+        subject: ticket.subject, description: ticket.description, priority: 'NORMAL',
+      });
+      expect(audit.recordForTenant).not.toHaveBeenCalled();
+    });
+
+    it.each([null, 'member-2'])('skips auditing an unchanged assignment of %s', async (membershipId) => {
+      ticketFindFirstMock.mockResolvedValue({ ...ticket, assigneeMembershipId: membershipId });
+      await service.assign(tenant, 'ticket-1', membershipId);
+      expect(audit.recordForTenant).not.toHaveBeenCalled();
+    });
+
+    it('records removal of an assignee by ID only', async () => {
+      ticketFindFirstMock.mockResolvedValue({ ...ticket, assigneeMembershipId: 'member-2' });
+      await service.assign(tenant, 'ticket-1', null);
+      expect(audit.recordForTenant).toHaveBeenCalledWith(
+        tenant,
+        expect.objectContaining({
+          action: 'TICKET_ASSIGNEE_CHANGED',
+          metadata: { fromMembershipId: 'member-2', toMembershipId: null },
+        }),
+        transactionClient,
+      );
+      expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
+    });
+
+    it.each(['addTag', 'removeTag'] as const)('skips auditing an idempotent %s', async (operation) => {
+      ticketTagFindUniqueMock.mockResolvedValue({ ticketId: 'ticket-1', tagId: 'tag-1' });
+      ticketTagDeleteManyMock.mockResolvedValue({ count: 0 });
+      await service[operation](tenant, 'ticket-1', 'tag-1');
+      expect(ticketTagCreateMock).not.toHaveBeenCalled();
+      expect(audit.recordForTenant).not.toHaveBeenCalled();
+    });
   });
 
   describe('existsInOrganization', () => {
@@ -1067,7 +1263,7 @@ describe('TicketsService', () => {
       id: tagId,
     });
 
-    ticketTagUpsertMock
+    ticketTagCreateMock
       .mockResolvedValue({});
 
     const result =
@@ -1091,21 +1287,9 @@ describe('TicketsService', () => {
     );
 
     expect(
-      ticketTagUpsertMock,
+      ticketTagCreateMock,
     ).toHaveBeenCalledWith({
-      where: {
-        ticketId_tagId: {
-          ticketId,
-          tagId,
-        },
-      },
-
-      update: {},
-
-      create: {
-        ticketId,
-        tagId,
-      },
+      data: { ticketId, tagId },
     });
 
     expect(result.tags).toEqual([
@@ -1142,7 +1326,7 @@ describe('TicketsService', () => {
     );
 
     expect(
-      ticketTagUpsertMock,
+      ticketTagCreateMock,
     ).not.toHaveBeenCalled();
     expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
     expect(ticketTagDeleteManyMock).not.toHaveBeenCalled();
@@ -1169,7 +1353,7 @@ describe('TicketsService', () => {
     ).not.toHaveBeenCalled();
 
     expect(
-      ticketTagUpsertMock,
+      ticketTagCreateMock,
     ).not.toHaveBeenCalled();
     expect(publishTicketUpdatedMock).not.toHaveBeenCalled();
     expect(ticketTagDeleteManyMock).not.toHaveBeenCalled();

@@ -5,13 +5,17 @@ import { PrismaService } from '../database/prisma.service.js';
 
 import { MembershipsService } from '../memberships/memberships.service.js';
 
+import { AuditService } from '../audit/audit.service.js';
+
 @Injectable()
 export class OrganizationsService {
   constructor(
-  private readonly prisma: PrismaService,
-  private readonly membershipsService:
-    MembershipsService,
-) {}
+    private readonly prisma: PrismaService,
+    private readonly membershipsService:
+      MembershipsService,
+    private readonly audit:
+      AuditService,
+  ) {}
 
   async createForUser(
     userId: string,
@@ -38,6 +42,26 @@ export class OrganizationsService {
               role: 'OWNER',
             },
           });
+
+        await this.audit.record(
+          {
+            organizationId:
+              organization.id,
+            actorUserId:
+              userId,
+            actorMembershipId:
+              membership.id,
+            actorRole:
+              membership.role,
+            action:
+              'ORGANIZATION_CREATED',
+            entityType:
+              'ORGANIZATION',
+            entityId:
+              organization.id,
+          },
+          transaction,
+        );
 
         return {
           id: organization.id,

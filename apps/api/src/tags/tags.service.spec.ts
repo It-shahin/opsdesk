@@ -10,11 +10,20 @@ import {
   jest,
 } from '@jest/globals';
 
+import type { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 import { TagsService } from './tags.service.js';
 
 describe('TagsService', () => {
+  const audit = {
+    record: jest.fn<(...args: unknown[]) => ReturnType<AuditService['record']>>(),
+    recordForTenant:
+      jest.fn<
+        (...args: unknown[]) => ReturnType<AuditService['recordForTenant']>
+      >(),
+  };
+
   let service: TagsService;
 
   const tagFindUniqueMock =
@@ -23,7 +32,16 @@ describe('TagsService', () => {
   const tagCreateMock =
     jest.fn();
 
+  const transactionClient = {
+    tag: { create: tagCreateMock },
+  };
+  const transactionMock = jest.fn(
+    async (callback: (tx: typeof transactionClient) => Promise<unknown>) =>
+      callback(transactionClient),
+  );
+
   const prisma = {
+    $transaction: transactionMock,
     tag: {
       findUnique:
         tagFindUniqueMock,
@@ -48,9 +66,11 @@ describe('TagsService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    transactionMock.mockImplementation(async (callback) => callback(transactionClient));
 
     service = new TagsService(
       prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
     );
   });
 
@@ -99,6 +119,17 @@ describe('TagsService', () => {
         },
       }),
     );
+
+    expect(audit.recordForTenant).toHaveBeenCalledWith(
+      tenant,
+      {
+        action: 'TAG_CREATED',
+        entityType: 'TAG',
+        entityId: 'tag-1',
+      },
+      transactionClient,
+    );
+    expect(audit.recordForTenant.mock.calls.at(-1)?.[2]).toBe(transactionClient);
   });
 
   it('rejects duplicate tag names inside the organization', async () => {
@@ -118,5 +149,22 @@ describe('TagsService', () => {
     expect(
       tagCreateMock,
     ).not.toHaveBeenCalled();
+    expect(audit.recordForTenant).not.toHaveBeenCalled();
+  });
+
+  it('preserves duplicate-name race handling without auditing a failed creation', async () => {
+    tagFindUniqueMock.mockResolvedValue(null);
+    tagCreateMock.mockRejectedValue({ code: 'P2002' });
+    await expect(service.create(tenant, 'Bug')).rejects.toBeInstanceOf(ConflictException);
+    expect(audit.recordForTenant).not.toHaveBeenCalled();
+  });
+
+  it('rejects tag creation when auditing fails', async () => {
+    tagFindUniqueMock.mockResolvedValue(null);
+    tagCreateMock.mockResolvedValue({ id: 'tag-1' });
+    const error = new Error('Audit insert failed');
+    audit.recordForTenant.mockRejectedValue(error);
+    await expect(service.create(tenant, 'Bug')).rejects.toBe(error);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });

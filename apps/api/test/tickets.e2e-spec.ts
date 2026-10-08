@@ -1,3 +1,4 @@
+import { AuditService } from '../src/audit/audit.service.js';
 import {
   type CanActivate,
   type ExecutionContext,
@@ -150,7 +151,7 @@ describe('Tickets HTTP security', () => {
   const membershipFindFirstMock =
     jest.fn();
   const tagFindFirstMock = jest.fn();
-  const ticketTagUpsertMock =
+  const ticketTagCreateMock =
     jest.fn();
   const ticketTagDeleteManyMock =
     jest.fn();
@@ -170,7 +171,15 @@ describe('Tickets HTTP security', () => {
     jest.fn();
 
   const transactionClient = {
+    auditLog: { create: jest.fn() },
+    ticketTag: {
+      findUnique: jest.fn(),
+      create: ticketTagCreateMock,
+      deleteMany: ticketTagDeleteManyMock,
+    },
     ticket: {
+      create: ticketCreateMock,
+      update: ticketUpdateMock,
       findFirst:
         txTicketFindFirstMock,
       updateMany:
@@ -308,8 +317,8 @@ describe('Tickets HTTP security', () => {
           tagFindFirstMock,
       },
       ticketTag: {
-        upsert:
-          ticketTagUpsertMock,
+        create:
+          ticketTagCreateMock,
         deleteMany:
           ticketTagDeleteManyMock,
       },
@@ -335,6 +344,7 @@ describe('Tickets HTTP security', () => {
           PermissionGuard,
           TenantMembershipGuard,
           TicketsService,
+          AuditService,
           {
             provide: PrismaService,
             useValue: prisma,
@@ -837,7 +847,7 @@ describe('Tickets HTTP security', () => {
       }),
     );
     expect(
-      ticketTagUpsertMock,
+      ticketTagCreateMock,
     ).not.toHaveBeenCalled();
   });
 
@@ -861,7 +871,7 @@ describe('Tickets HTTP security', () => {
       .mockResolvedValue({
         id: TAG_A,
       });
-    ticketTagUpsertMock
+    ticketTagCreateMock
       .mockResolvedValue({});
 
     const response =

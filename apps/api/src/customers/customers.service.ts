@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { TenantContext } from '../tenancy/tenant-context.types.js';
 
@@ -67,6 +68,7 @@ export class CustomersService {
 }
   constructor(
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(
@@ -80,30 +82,47 @@ export class CustomersService {
       );
     }
 
-    return this.prisma.customer.create({
-      data: {
-        organizationId:
-          tenant.organizationId,
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const customer =
+          await transaction.customer.create({
+            data: {
+              organizationId:
+                tenant.organizationId,
 
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        company: input.company,
-        notes: input.notes,
-      },
+              name: input.name,
+              email: input.email,
+              phone: input.phone,
+              company: input.company,
+              notes: input.notes,
+            },
 
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        company: true,
-        notes: true,
-        archivedAt: true,
-        createdAt: true,
-        updatedAt: true,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              company: true,
+              notes: true,
+              archivedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+        await this.audit.recordForTenant(
+          tenant,
+          {
+            action: 'CUSTOMER_CREATED',
+            entityType: 'CUSTOMER',
+            entityId: customer.id,
+          },
+          transaction,
+        );
+
+        return customer;
       },
-    });
+    );
 }
 
   async list(
@@ -343,56 +362,80 @@ async update(
     );
   }
 
-  return this.prisma.customer.update({
-    where: {
-      id: customer.id,
+  const changedFields =
+    providedFields.map(
+      ([field]) => field,
+    );
+
+  return this.prisma.$transaction(
+    async (transaction) => {
+      const updated = await transaction.customer.update({
+        where: {
+          id: customer.id,
+        },
+
+        data: {
+          ...(input.name !== undefined
+            ? {
+                name: input.name,
+              }
+            : {}),
+
+          ...(input.email !== undefined
+            ? {
+                email: input.email,
+              }
+            : {}),
+
+          ...(input.phone !== undefined
+            ? {
+                phone: input.phone,
+              }
+            : {}),
+
+          ...(input.company !== undefined
+            ? {
+                company:
+                  input.company,
+              }
+            : {}),
+
+          ...(input.notes !== undefined
+            ? {
+                notes: input.notes,
+              }
+            : {}),
+        },
+
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          company: true,
+          notes: true,
+          archivedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'CUSTOMER_UPDATED',
+          entityType: 'CUSTOMER',
+          entityId: updated.id,
+          metadata: {
+            changedFields,
+          },
+        },
+        transaction,
+      );
+
+      return updated;
     },
-
-    data: {
-      ...(input.name !== undefined
-        ? {
-            name: input.name,
-          }
-        : {}),
-
-      ...(input.email !== undefined
-        ? {
-            email: input.email,
-          }
-        : {}),
-
-      ...(input.phone !== undefined
-        ? {
-            phone: input.phone,
-          }
-        : {}),
-
-      ...(input.company !== undefined
-        ? {
-            company:
-              input.company,
-          }
-        : {}),
-
-      ...(input.notes !== undefined
-        ? {
-            notes: input.notes,
-          }
-        : {}),
-    },
-
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      company: true,
-      notes: true,
-      archivedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  );
 }
 
 async archive(
@@ -426,28 +469,44 @@ async archive(
     );
   }
 
-  return this.prisma.customer.update({
-    where: {
-      id: customer.id,
-    },
+  return this.prisma.$transaction(
+    async (transaction) => {
+      const updated = await transaction.customer.update({
+        where: {
+          id: customer.id,
+        },
 
-    data: {
-      archivedAt:
-        new Date(),
-    },
+        data: {
+          archivedAt:
+            new Date(),
+        },
 
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      company: true,
-      notes: true,
-      archivedAt: true,
-      createdAt: true,
-      updatedAt: true,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          company: true,
+          notes: true,
+          archivedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'CUSTOMER_ARCHIVED',
+          entityType: 'CUSTOMER',
+          entityId: updated.id,
+        },
+        transaction,
+      );
+
+      return updated;
     },
-  });
+  );
 }
 
 async restore(
@@ -490,27 +549,43 @@ async restore(
     );
   }
 
-  return this.prisma.customer.update({
-    where: {
-      id: customer.id,
-    },
+  return this.prisma.$transaction(
+    async (transaction) => {
+      const updated = await transaction.customer.update({
+        where: {
+          id: customer.id,
+        },
 
-    data: {
-      archivedAt: null,
-    },
+        data: {
+          archivedAt: null,
+        },
 
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      company: true,
-      notes: true,
-      archivedAt: true,
-      createdAt: true,
-      updatedAt: true,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          company: true,
+          notes: true,
+          archivedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      await this.audit.recordForTenant(
+        tenant,
+        {
+          action: 'CUSTOMER_RESTORED',
+          entityType: 'CUSTOMER',
+          entityId: updated.id,
+        },
+        transaction,
+      );
+
+      return updated;
     },
-  });
+  );
 }
 }
 
