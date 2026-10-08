@@ -28,6 +28,7 @@ import { JobsModule } from './jobs/jobs.module.js';
 import { InboundEmailModule } from './email/inbound-email.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { AuditModule } from './audit/audit.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -57,6 +58,7 @@ AppModule = __decorate([
             InboundEmailModule,
             RealtimeModule,
             AuditModule,
+            AnalyticsModule,
         ],
         controllers: [AppController],
         providers: [AppService],

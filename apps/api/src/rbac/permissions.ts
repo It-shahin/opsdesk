@@ -22,6 +22,9 @@ export const PERMISSIONS = {
 
   AUDIT_LOGS_READ:
     'audit-logs:read',
+
+  ANALYTICS_READ:
+  'analytics:read',
 } as const;
 
 export type Permission =

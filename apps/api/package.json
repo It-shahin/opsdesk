@@ -20,6 +20,7 @@
     "test:cov": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "test:e2e": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand",
     "test:audit:db": "cross-env AUDIT_DATABASE_TESTS=1 NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand audit-database.e2e-spec.ts",
+    "test:analytics:db": "cross-env ANALYTICS_DATABASE_TESTS=1 NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand analytics-database.e2e-spec.ts",
     "test:e2e:realtime": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand realtime.e2e-spec.ts",
     "dev": "nest start --watch --entryFile main.js",
     "contract:emit": "prisma contract emit",
