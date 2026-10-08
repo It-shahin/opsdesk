@@ -6,6 +6,7 @@ import {
   ContactRound,
   Inbox,
   Users,
+  LayoutDashboard,
 } from 'lucide-react';
 
 import {
@@ -32,6 +33,22 @@ export function AppNavigation({
   const items =
     organizationId
       ? [
+          {
+            label:
+              'Dashboard',
+
+            href:
+              `/app/${organizationId}/dashboard`,
+
+            icon:
+              LayoutDashboard,
+
+            active:
+              pathname.includes(
+                '/dashboard',
+              ),
+          },
+          
           {
             label:
               'Inbox',

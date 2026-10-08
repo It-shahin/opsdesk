@@ -568,6 +568,12 @@ export function RealtimeProvider({
 
   useEffect(
     () => {
+      function invalidateAnalytics(organizationId: string) {
+        void queryClient.invalidateQueries({
+          queryKey: ['analytics', organizationId],
+        });
+      }
+
       const realtimeUrl =
         process.env
           .NEXT_PUBLIC_REALTIME_URL;
@@ -729,6 +735,8 @@ export function RealtimeProvider({
         (
           payload,
         ) => {
+          invalidateAnalytics(payload.organizationId);
+
           void queryClient
             .invalidateQueries({
               queryKey: [
@@ -754,6 +762,8 @@ export function RealtimeProvider({
         (
           payload,
         ) => {
+          invalidateAnalytics(payload.organizationId);
+
           void queryClient
             .invalidateQueries({
               queryKey: [
@@ -790,6 +800,8 @@ export function RealtimeProvider({
         (
           payload,
         ) => {
+          invalidateAnalytics(payload.organizationId);
+
           void queryClient
             .invalidateQueries({
               queryKey: [
@@ -837,6 +849,8 @@ export function RealtimeProvider({
         (
           payload,
         ) => {
+          invalidateAnalytics(payload.organizationId);
+
           void queryClient
             .invalidateQueries({
               queryKey: [
