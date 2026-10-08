@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import {
   PermissionGuard,
@@ -54,6 +55,12 @@ export class AttachmentsController {
 
   @Post('init')
   @HttpCode(200)
+  @Throttle({
+    default: {
+      limit: 30,
+      ttl: minutes(1),
+    },
+  })
   @RequirePermissions(
     PERMISSIONS.TICKETS_WRITE,
   )
@@ -92,6 +99,12 @@ export class AttachmentsController {
   @Post(
     ':attachmentId/complete',
   )
+  @Throttle({
+    default: {
+      limit: 60,
+      ttl: minutes(1),
+    },
+  })
   @HttpCode(200)
   @RequirePermissions(
     PERMISSIONS.TICKETS_WRITE,

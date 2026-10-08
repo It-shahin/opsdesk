@@ -1,80 +1,55 @@
-import type {
-  INestApplicationContext,
-} from '@nestjs/common';
+import type { INestApplicationContext } from '@nestjs/common';
 
-import {
-  IoAdapter,
-} from '@nestjs/platform-socket.io';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
-import type {
-  createAdapter,
-} from '@socket.io/redis-adapter';
+import type { createAdapter } from '@socket.io/redis-adapter';
 
-type IoServerOptions = NonNullable<
-  Parameters<IoAdapter['createIOServer']>[1]
->;
+type IoServerOptions = NonNullable<Parameters<IoAdapter['createIOServer']>[1]>;
 
-type RedisAdapterConstructor =
-  ReturnType<
-    typeof createAdapter
-  >;
+type RedisAdapterConstructor = ReturnType<typeof createAdapter>;
 
-export class SocketIoAdapter
-  extends IoAdapter
-{
+export class SocketIoAdapter extends IoAdapter {
+  private readonly allowedOrigin: string;
+
   constructor(
-    app:
-      INestApplicationContext,
+    app: INestApplicationContext,
 
-    private readonly webOrigin:
-      string,
+    webOrigin: string,
 
-    private readonly redisAdapter:
-    RedisAdapterConstructor,
-
+    private readonly redisAdapter: RedisAdapterConstructor,
   ) {
-    super(
-      app,
-    );
+    super(app);
+    this.allowedOrigin = new URL(webOrigin).origin;
   }
 
   override createIOServer(
-  port:
-    number,
+    port: number,
 
-  options?:
-    Partial<IoServerOptions>,
-): ReturnType<
-  IoAdapter['createIOServer']
-> {
-  const serverOptions:
-    Partial<IoServerOptions> =
-    {
+    options?: Partial<IoServerOptions>,
+  ): ReturnType<IoAdapter['createIOServer']> {
+    const serverOptions: Partial<IoServerOptions> = {
       ...options,
 
       cors: {
-        origin:
-          this.webOrigin,
+        origin: this.allowedOrigin,
 
-        methods: [
-          'GET',
-          'POST',
-        ],
+        methods: ['GET', 'POST'],
 
-        credentials:
-          false,
+        credentials: false,
       },
+
+      // Engine.IO handshakes require an exact Origin match, including WebSockets.
+      allowRequest: (request, callback) => {
+        callback(null, request.headers.origin === this.allowedOrigin);
+      },
+
+      maxHttpBufferSize: 16 * 1024,
     };
 
-  const server = super.createIOServer(
-    port,
-    serverOptions as IoServerOptions,
-  );
+    const server = super.createIOServer(port, serverOptions as IoServerOptions);
 
-  server.adapter(
-    this.redisAdapter,
-  );
+    server.adapter(this.redisAdapter);
 
-  return server;
-}
+    return server;
+  }
 }

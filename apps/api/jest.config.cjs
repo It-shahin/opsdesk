@@ -11,6 +11,8 @@ module.exports = {
 
   testEnvironment: 'node',
 
+  setupFilesAfterEnv: ['<rootDir>/test/setup-nest-esm.ts'],
+
   roots: [
     '<rootDir>/src',
     '<rootDir>/test',

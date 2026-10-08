@@ -5,6 +5,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { UsersService } from '../users/users.service.js';
@@ -23,6 +24,12 @@ export class InvitationAcceptanceController {
 
   @Post('accept')
   @HttpCode(200)
+  @Throttle({
+    default: {
+      limit: 20,
+      ttl: minutes(1),
+    },
+  })
   async accept(
     @Req()
     request: AuthenticatedRequest,

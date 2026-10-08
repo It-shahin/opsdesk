@@ -5,6 +5,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import type {
   RawBodyRequest,
@@ -52,6 +53,12 @@ export class ResendWebhookController {
   @Public()
   @Post()
   @HttpCode(200)
+  @Throttle({
+    default: {
+      limit: 600,
+      ttl: minutes(1),
+    },
+  })
   async handle(
     @Req()
     request:

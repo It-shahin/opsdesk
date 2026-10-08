@@ -1,8 +1,5 @@
 import { Transform } from 'class-transformer';
-import {
-  IsEmail,
-  IsIn,
-} from 'class-validator';
+import { IsEmail, IsIn, MaxLength } from 'class-validator';
 
 import type { Role } from '../../generated/prisma/enums.js';
 
@@ -15,11 +12,10 @@ const INVITABLE_ROLES = [
 
 export class CreateInvitationDto {
   @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim().toLowerCase()
-      : value,
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail()
+  @MaxLength(254)
   email!: string;
 
   @IsIn([...INVITABLE_ROLES])

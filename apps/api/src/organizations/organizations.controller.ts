@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { TenantMembershipGuard } from '../tenancy/tenant-membership.guard.js';
@@ -23,6 +24,13 @@ export class OrganizationsController {
   ) {}
 
   @Post()
+  @Throttle({
+    default: {
+      limit: 5,
+      ttl: minutes(10),
+      blockDuration: minutes(10),
+    },
+  })
   async create(
     @Req() request: AuthenticatedRequest,
     @Body() dto: CreateOrganizationDto,

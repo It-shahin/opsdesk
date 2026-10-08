@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:auth": "node --test --test-isolation=none test/api-auth.test.cjs"
+    "test:auth": "node --test --test-isolation=none test/api-auth.test.cjs",
+    "test:security": "node --test --test-isolation=none test/api-security.test.cjs"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.29.0",

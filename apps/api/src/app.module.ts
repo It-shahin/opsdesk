@@ -24,6 +24,7 @@ import { InboundEmailModule } from './email/inbound-email.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
+import { SecurityModule } from './security/security.module.js';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
   RealtimeModule,
   AuditModule,
   AnalyticsModule,
+  SecurityModule,
 ],
   controllers: [AppController],
   providers: [AppService],
