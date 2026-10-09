@@ -7,3 +7,4 @@ node_modules
 .windsurf
 # Turborepo cache
 .turbo/
+compose.env
