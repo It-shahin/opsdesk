@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   PNPM_VERSION: "10.15.1"
 
 
@@ -119,6 +119,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/opsdesk
+        run: pnpm exec prisma generate --config prisma7.config.ts
 
       - name: Run API E2E tests
         run: pnpm --filter api test:e2e
