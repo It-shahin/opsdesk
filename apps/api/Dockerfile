@@ -2,7 +2,13 @@
 
 ARG NODE_VERSION=22
 
-FROM node:${NODE_VERSION}-bookworm-slim AS base
+FROM node:${NODE_VERSION}-bookworm-slim AS os
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM os AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="${PNPM_HOME}:${PATH}"
@@ -78,14 +84,16 @@ COPY apps/api/package.json ./apps/api/package.json
 RUN pnpm install \
     --frozen-lockfile \
     --prod \
-    --filter api...
+    --filter api... \
+    && cd apps/api \
+    && pnpm exec prisma --version
 
 
 # --------------------------------------------------
 # Minimal production runtime
 # --------------------------------------------------
 
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM os AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3001
@@ -107,6 +115,14 @@ COPY --from=build \
 COPY --from=build \
   /workspace/apps/api/package.json \
   ./package.json
+
+COPY --from=build \
+  /workspace/apps/api/prisma \
+  ./prisma
+
+COPY --from=build \
+  /workspace/apps/api/prisma7.config.ts \
+  ./prisma7.config.ts
 
 USER node
 
