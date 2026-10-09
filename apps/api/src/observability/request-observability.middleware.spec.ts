@@ -27,6 +27,7 @@ describe('HTTP logging privacy', () => {
       const req = {
         method: 'POST',
         path: '/v1/tickets',
+        route: { path: '/v1/tickets' },
         url: '/v1/tickets?search=PRIVATE_CUSTOMER_EMAIL',
         originalUrl: '/v1/tickets?search=PRIVATE_CUSTOMER_EMAIL',
         headers: {
@@ -71,6 +72,35 @@ describe('HTTP logging privacy', () => {
         method: 'POST',
         path: '/v1/tickets',
       });
+    },
+  );
+
+  it.each([200, 404, 'aborted'] as const)(
+    'redacts customer IDs, encoded tokens and unmatched paths from %s logs',
+    (status) => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+      const req = {
+        method: 'GET',
+        path: '/v1/organizations/PRIVATE_ORG/customers/private%40example.test',
+        route: status === 404 ? undefined : {
+          path: '/v1/organizations/:organizationId/customers/:customerId',
+        },
+        header: () => undefined,
+      } as unknown as RequestWithId;
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: status === 'aborted' ? 200 : status,
+        setHeader: jest.fn(),
+      });
+      new RequestObservabilityMiddleware().use(req, response as unknown as Response, () => {});
+      response.emit(status === 'aborted' ? 'close' : 'finish');
+      const entries = [...log.mock.calls, ...warn.mock.calls];
+      expect(entries).toHaveLength(1);
+      const serialized = String(entries[0]![0]);
+      expect(serialized).not.toContain('PRIVATE_ORG');
+      expect(serialized).not.toContain('private%40example.test');
+      expect(JSON.parse(serialized).path).toBe(status === 404 ? '/[unmatched]' :
+        '/v1/organizations/:organizationId/customers/:customerId');
     },
   );
 });

@@ -3,11 +3,12 @@ import {
   ForbiddenException,
   Get,
   type INestApplication,
+  Logger,
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Throttle } from '@nestjs/throttler';
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import { AccessTokenVerifierService } from '../src/auth/access-token-verifier.service.js';
 import { AuthGuard } from '../src/auth/auth.guard.js';
@@ -20,6 +21,9 @@ const providedId = '26ce1b19-42a1-4f6a-8ec8-44669091138c';
 
 @Controller('request-id')
 class RequestIdController {
+  @Get('customers/:customerId') customer() {
+    return { ok: true };
+  }
   @Get() get() {
     return { ok: true };
   }
@@ -133,4 +137,40 @@ describe('Request IDs across the HTTP pipeline', () => {
       .expect(429);
     expect(response.headers['x-request-id']).toBe(providedId);
   });
+
+  it.each([
+    [
+      '/request-id/customers/private%40example.test?token=SECRET',
+      200,
+      '/request-id/customers/:customerId',
+    ],
+    ['/unmatched/SECRET/private%40example.test', 404, '/[unmatched]'],
+  ])(
+    'logs a route template or redacted fallback for %s',
+    async (path, status, expectedPath) => {
+      const log = jest
+        .spyOn(Logger.prototype, 'log')
+        .mockImplementation(() => {});
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => {});
+      try {
+        await request(app.getHttpServer())
+          .get(path)
+          .set('Authorization', 'Bearer test-token')
+          .expect(status);
+        const events = [...log.mock.calls, ...warn.mock.calls]
+          .map(([message]) => String(message))
+          .filter((message) => message.includes('http.request'));
+        expect(events).toHaveLength(1);
+        expect(JSON.parse(events[0]!).path).toBe(expectedPath);
+        expect(events[0]).not.toMatch(
+          /SECRET|private%40example.test|private@example.test/,
+        );
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    },
+  );
 });

@@ -183,6 +183,16 @@ export class JobsService implements OnModuleDestroy, OnModuleInit {
     );
   }
 
+  async getQueueSnapshot(name: (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]) {
+    const queue =
+      name === QUEUE_NAMES.EMAIL ? this.emailQueue : this.maintenanceQueue;
+    const [counts, paused] = await Promise.all([
+      queue.getJobCounts('waiting', 'active', 'delayed', 'failed'),
+      queue.isPaused(),
+    ]);
+    return { counts, paused };
+  }
+
   async ensureEmailDeliveryQueued(emailDeliveryId: string) {
     const jobId = `email-delivery-${emailDeliveryId}`;
 

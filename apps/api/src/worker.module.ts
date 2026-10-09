@@ -31,6 +31,8 @@ import {
 import {
   MaintenanceWorker,
 } from './jobs/maintenance.worker.js';
+import { RedisModule } from './redis/redis.module.js';
+import { WorkerHeartbeatService } from './observability/worker-heartbeat.service.js';
 
 @Module({
   imports: [
@@ -50,11 +52,13 @@ import {
     RealtimePublisherModule,
 
     AttachmentsModule,
+    RedisModule,
   ],
 
   providers: [
     EmailWorker,
     MaintenanceWorker,
+    WorkerHeartbeatService,
   ],
 })
 export class WorkerModule {}

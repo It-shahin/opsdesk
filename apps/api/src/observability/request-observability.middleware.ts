@@ -24,6 +24,13 @@ export type RequestWithId =
       string;
   };
 
+// The router's template preserves endpoint identity without tenant IDs, tokens,
+// emails, or arbitrary customer-supplied segments. Never log a raw unmatched URL.
+function logPath(request: Request): string {
+  const route = request.route as { path?: unknown } | undefined;
+  return typeof route?.path === 'string' ? route.path : '/[unmatched]';
+}
+
 @Injectable()
 export class RequestObservabilityMiddleware
   implements NestMiddleware
@@ -81,15 +88,8 @@ export class RequestObservabilityMiddleware
           Date.now() -
           startedAt;
 
-        /*
-         * request.path deliberately
-         * excludes the query string.
-         *
-         * Search/filter query values
-         * may contain customer data.
-         */
         const path =
-          request.path;
+          logPath(request);
 
         /*
          * Successful liveness probes
@@ -97,7 +97,7 @@ export class RequestObservabilityMiddleware
          * production logs.
          */
         if (
-          path ===
+          request.path ===
             '/health/live' &&
           response.statusCode <
             400
@@ -191,7 +191,7 @@ export class RequestObservabilityMiddleware
               request.method,
 
             path:
-              request.path,
+              logPath(request),
 
             durationMs:
               Date.now() -
