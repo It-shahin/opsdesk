@@ -23,7 +23,7 @@ success. A local environment failure is separate from hosted CI verification.
 | R2 lifecycle | PASS | Init 200, signed PUT 200, complete 200, note link 201, authorized signed GET 200, exact 70-byte content match |
 | API unit regression | PASS | 44 suites / 445 tests locally, including safe diagnostics and retained count trends |
 | Security E2E | PASS | 26 tests locally; synthetic auth/RBAC/tenancy/CSRF/rate-limit coverage |
-| Web auth / security | PASS | 11 auth and 46 security/recovery tests locally (44 on primary release plus 2 follow-up recovery regressions) |
+| Web auth / security | PASS | 11 auth and 48 security/recovery tests locally (44 on primary release plus 4 follow-up recovery regressions) |
 | API/web lint and builds | PASS | Both pass; 2 existing lint warnings per app; no new errors |
 | Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
 | Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
@@ -157,12 +157,25 @@ checked existed; the expanded report/images are checked again before delivery.
 A long-running background session exposed stale data after disconnect/reconnect
 and accumulated recovery notifications. Transport/browser throttling can cause
 disconnects; this release does not claim to eliminate network interruptions.
-The follow-up refreshes active queries after `realtime.ready` on a reconnection,
-marks inactive caches stale for later use, and gives the recovery toast a stable
-ID. Initial readiness does not redundantly refresh. A harness executes the actual
-TypeScript provider's socket handlers and verifies a missed CLOSED mutation is
-refetched and repeated recovery notices share one ID. No authentication, role or
+The follow-up refreshes active queries **after successful organization-room
+rejoin acknowledgment**, marks inactive caches stale for later use, and gives
+the recovery toast a stable ID. Ticket-message queries are reconciled again after
+the ticket-room ACK because delivery updates use ticket rooms. Subscribing before
+refetching closes the gap where a write could commit after a snapshot read but
+before room subscription. Initial readiness/join does not redundantly refresh.
+Four tests execute the actual TypeScript provider's socket handlers, covering
+missed/gap writes, ticket-delivery reconciliation, notification replacement and a
+denied rejoin that triggers no reconciliation. No authentication, role or
 room-membership checks change.
+
+A controlled live baseline test used only the CLOSED disposable ticket. The
+browser dropped one `ticket.updated` server frame, then closed/reconnected only
+its own WebSocket; HTTP and authentication remained intact. A guarded priority
+PATCH returned 200/LOW (request `74cff75f-24c7-4ab8-b5c4-e9083875422a`), while
+the UI remained NORMAL even after reconnect. This reproduced the missing-refresh
+bug beyond the background-tab observation. The test restored priority NORMAL
+through the BFF and reloaded the inbox. The same check is repeated after the
+follow-up deploy. No credentials or socket authentication frames were extracted.
 
 Latency samples used the existing authenticated Chrome session, sequential BFF
 ticket-list requests with `cache: no-store`, no artificial throttling, and measured
