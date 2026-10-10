@@ -43,4 +43,4 @@ Safeguard tests verify environment rejection and that runtime entrypoints/module
 
 ## Known verification limits
 
-The [staging report](demo/FINAL-VERIFICATION.md) distinguishes UI denial from a live HTTP 404 check. The latter was blocked by the browser and remains not tested with the second real account. Read-only verification did not exercise outbound delivery or alter demo records. Backup restoration, malware scanning, penetration testing, and production readiness are outside that result.
+The [Phase 11G report](PHASE-11G-REPORT.md) records a real nonmember's supported BFF/API 404 and matching API log, along with synthetic mutations, actual realtime propagation, signed attachment transfer and one approved sandbox email round trip. The earlier [Phase 11E report](demo/FINAL-VERIFICATION.md) remains a historical read-only result. No credentials were extracted or identities impersonated. Backup restoration, malware scanning, penetration testing and production readiness remain uncertified.

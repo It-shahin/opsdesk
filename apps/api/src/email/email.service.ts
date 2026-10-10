@@ -18,6 +18,7 @@ import {
 import {
   buildTicketReplyAddress,
 } from './inbound-email-routing.js';
+import { providerDiagnostic, type ProviderDiagnostic } from './email-provider-diagnostics.js';
 
 interface SendTicketReplyInput {
   deliveryId:
@@ -47,6 +48,7 @@ export class EmailProviderError
 
     public readonly retryable:
       boolean,
+    public readonly diagnostic?: ProviderDiagnostic,
   ) {
     super(message);
 
@@ -178,9 +180,10 @@ export class EmailService {
        * in thrown/logged errors.
        */
       throw new EmailProviderError(
-        `Resend email delivery failed: ${error.name}`,
+        `Resend email delivery failed: ${providerDiagnostic(error).providerCode}`,
 
         retryable,
+        providerDiagnostic(error),
       );
     }
 

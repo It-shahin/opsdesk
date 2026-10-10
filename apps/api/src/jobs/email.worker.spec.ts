@@ -239,6 +239,19 @@ describe(
         );
     });
 
+    it('logs safe provider diagnostics before a permanent rejection is wrapped by BullMQ', async () => {
+      sendTicketReplyMock.mockRejectedValue(new EmailProviderError(
+        'private@example.test SECRET', false,
+        { providerCode: 'validation_error', providerStatus: 403 },
+      ));
+      await expect(processTicketReply(createJob())).rejects.toBeInstanceOf(UnrecoverableError);
+      expect(logger.error).toHaveBeenCalledWith(JSON.stringify({
+        event: 'email.provider.failed', providerCode: 'validation_error',
+        providerStatus: 403, retryable: false, finalAttempt: true,
+      }));
+      expect(JSON.stringify(logger.error.mock.calls)).not.toMatch(/SECRET|private@/);
+    });
+
     it(
       'claims a pending delivery and marks it sent',
       async () => {

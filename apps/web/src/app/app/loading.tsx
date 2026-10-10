@@ -5,6 +5,8 @@ import {
 export default function AppLoading() {
   return (
     <div
+      role="status"
+      aria-label="Loading workspace"
       className="mx-auto max-w-7xl space-y-6"
     >
       <div
