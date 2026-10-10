@@ -23,7 +23,7 @@ success. A local environment failure is separate from hosted CI verification.
 | R2 lifecycle | PASS | Init 200, signed PUT 200, complete 200, note link 201, authorized signed GET 200, exact 70-byte content match |
 | API unit regression | PASS | 44 suites / 445 tests locally, including safe diagnostics and retained count trends |
 | Security E2E | PASS | 26 tests locally; synthetic auth/RBAC/tenancy/CSRF/rate-limit coverage |
-| Web auth / security | PASS | 11 auth and 44 security tests locally |
+| Web auth / security | PASS | 11 auth and 48 security/recovery tests locally (44 on primary release plus 4 follow-up recovery regressions) |
 | API/web lint and builds | PASS | Both pass; 2 existing lint warnings per app; no new errors |
 | Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
 | Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
@@ -35,11 +35,12 @@ success. A local environment failure is separate from hosted CI verification.
 | Controlled error-state browser check | PASS | Browser-only synthetic 503 displayed error and Try again; removing interception and retrying restored real tickets |
 | Font regression fix | PASS | Live baseline computed Times New Roman due self-referencing font variable; local production build computes Geist/Arial fallback |
 | Keyboard access source/build | PASS | Skip link, focusable main and unnested nav added |
-| Live postdeployment keyboard check | NOT TESTED | Pending authenticated staging rollout |
+| Live postdeployment keyboard check | PASS | Actual Tab focused visible skip link, Enter focused main; computed Geist font and zero nested nav landmarks |
 | Repeatable latency sample | PASS (limited) | Five sequential authenticated no-store BFF requests: 309, 172, 159, 170, 157 ms; median 170 ms |
 | Field Core Web Vitals / Lighthouse certification | NOT TESTED | No field dataset or DevTools audit; request timings are not LCP/INP/CLS or an SLA |
-| Safety review / staging merge | NOT TESTED | [PR #13](https://github.com/It-shahin/opsdesk/pull/13) has no inline review issues; Sourcery explicitly requests a human reviewer; confirmation pending |
-| 11G-D: staging rollout and postrelease probes | NOT TESTED | Pending final review, merge and Railway observation |
+| Safety review / primary staging merge | PASS | Human reviewed and approved after Sourcery requested review; exact-head five-job CI passed; PR #13 merged to staging only |
+| 11G-D: primary staging rollout and probes | PASS | All five Railway services SUCCESS, no pending work; Web/API readiness 200, DB/Redis up, protected routes unchanged; deployment IDs below |
+| Reconnect recovery follow-up | PASS (regression) | Real provider event harness verifies missed-change invalidation and notification replacement; live follow-up rollout pending |
 | Production backup and restore certification | NOT TESTED | Paid backups declined; no restore drill; production release remains blocked |
 
 ## 11G-A: cause, fix and boundaries
@@ -114,6 +115,14 @@ creating a CUSTOMER public reply on the same ticket and reopening it to OPEN.
 The user used their own short test sentence rather than the suggested exact marker;
 the evidence is the correlated arrival, routed message and live UI update.
 
+The disposable ticket was subsequently RESOLVED then CLOSED through supported
+BFF status transitions (both 200), with subject/customer identity guards.
+Request IDs: `3869a23e-9cab-4fda-8e2a-ed9f69b96c7e` and
+`0b2d2cc7-5826-4497-8e13-dc1ecf90026f`. Customer, messages, audit history and
+attachment remain available; no rows or objects were deleted. A read-only queue
+inspection at 14:55:34 UTC confirmed the same four historical failures and no
+new failed jobs after the approved email round trip.
+
 This proves one sandbox round trip. It does not certify arbitrary recipients,
 bounce/complaint handling against real mailboxes, attachment delivery in outbound
 email, or every provider failure mode. Those modes remain covered by automated
@@ -137,10 +146,48 @@ skeleton; a synthetic 503 showed the error/Retry UI, and a real refetch recovere
 These interceptions did not change staging services or database state. Authentication stays
 with the supported Auth0 flow; local checks used inert provider placeholders.
 
+The deployed UI passed actual Tab/Enter skip-link testing. The focused skip link
+was visible (171-pixel width), Enter moved focus to `workspace-content`, and
+there were no nested navigation landmarks. Desktop/mobile screenshots in
+`docs/images/phase-11g-*.png` were captured after actual tickets and realtime were
+ready. Account identity, all visible emails and assignee names were masked at
+capture; customer data is synthetic. All 35 original local documentation targets
+checked existed; the expanded report/images are checked again before delivery.
+
+A long-running background session exposed stale data after disconnect/reconnect
+and accumulated recovery notifications. Transport/browser throttling can cause
+disconnects; this release does not claim to eliminate network interruptions.
+The follow-up refreshes active queries **after successful organization-room
+rejoin acknowledgment**, marks inactive caches stale for later use, and gives
+the recovery toast a stable ID. Ticket-message queries are reconciled again after
+the ticket-room ACK because delivery updates use ticket rooms. Subscribing before
+refetching closes the gap where a write could commit after a snapshot read but
+before room subscription. Initial readiness/join does not redundantly refresh.
+Four tests execute the actual TypeScript provider's socket handlers, covering
+missed/gap writes, ticket-delivery reconciliation, notification replacement and a
+denied rejoin that triggers no reconciliation. No authentication, role or
+room-membership checks change.
+
+A controlled live baseline test used only the CLOSED disposable ticket. The
+browser dropped one `ticket.updated` server frame, then closed/reconnected only
+its own WebSocket; HTTP and authentication remained intact. A guarded priority
+PATCH returned 200/LOW (request `74cff75f-24c7-4ab8-b5c4-e9083875422a`), while
+the UI remained NORMAL even after reconnect. This reproduced the missing-refresh
+bug beyond the background-tab observation. The test restored priority NORMAL
+through the BFF and reloaded the inbox. The same check is repeated after the
+follow-up deploy. No credentials or socket authentication frames were extracted.
+
 Latency samples used the existing authenticated Chrome session, sequential BFF
 ticket-list requests with `cache: no-store`, no artificial throttling, and measured
 fetch plus body consumption. Five samples and a median describe that moment only;
 no before/after speedup, field vitals or performance certification is claimed.
+
+Three authenticated desktop reloads (warm browser cache, no throttling) took
+713, 554 and 448 ms from navigation start until actual ticket content appeared;
+median 554 ms. DOMContentLoaded was 350, 205 and 183 ms respectively. These
+pre-release samples are a realistic moment-in-time observation, not field vitals
+or an improvement claim. Local production landing checks had no overflow at
+1440 and 390 pixels; their timing is not compared with authenticated staging.
 
 ## 11G-D: reproducible release gates
 
@@ -175,15 +222,37 @@ database integration, web and Docker images. Full Redis E2E had 199 tests passin
 40 DB-dependent tests are intentionally skipped there and run in the separate
 PostgreSQL job: audit 22, analytics 5, demo 13, all passing. Docker runtime and
 migration targets, entrypoints, standalone web server and Compose validation passed.
-Final head checks must remain green before merge.
+Final documentation head `844345ce574c833b0aa562731ef6bc3d77f51620` also passed
+all five jobs in [run 38061291313](https://github.com/It-shahin/opsdesk/actions/runs/38061291313).
+The merge commit's automatic [push run 38061619922](https://github.com/It-shahin/opsdesk/actions/runs/38061619922)
+passed before Railway's configured CI gate released the deployments.
 
 Only the new feature branch and staging target are in scope. No production merge,
 security bypass, schema migration, paid resource, failed-job cleanup or credential
 publication is authorized here. Release notes, checklist and runbook are updated.
-The [release PR is #13](https://github.com/It-shahin/opsdesk/pull/13). The code diff
+The [primary release PR is #13](https://github.com/It-shahin/opsdesk/pull/13). The code diff
 was inspected for privacy, preserved retry semantics, tenant/auth boundaries and
 absence of migrations. Sourcery reported no inline issues but explicitly assessed
 the change as needing a human reviewer because logging defects could disclose
-private provider details or hide actionable failures. That final review is pending;
-CI alone is not treated as human approval. Merge/deployment evidence will be added
-after those gates complete.
+private provider details or hide actionable failures. The user reviewed and approved
+the staging merge after that assessment. CI was not treated as human approval.
+
+## Primary release deployment snapshot
+
+Merged staging commit: **`1439b5c45ace86b8eb384687f4713da51e3d0d56`**.
+All three application deployments report that commit and branch
+`feat/phase-11-deployment`. This records the primary release snapshot; the focused
+reconnect follow-up is separately reviewed and checked before staging promotion.
+
+| Service | Successful deployment ID |
+| --- | --- |
+| Web | `7d241141-740e-47b1-a7ff-a447490c958e` |
+| API | `bbeade01-2fd8-45b0-bb28-f7e446e2ca28` |
+| Worker | `d55394bf-831f-451f-917c-b37b399711e0` |
+
+At 15:04:28 and 15:04:58 UTC the new API emitted email queue health with waiting
+0, active 0, delayed 1, failed 4, workersAlive 1, `consumerStatus=up`,
+`retainedFailureTrend=unchanged`, and overall `status=degraded`. Maintenance was
+up with zero failures. Worker heartbeat at 15:05:14 UTC reported both consumers
+healthy. Web health, API live/ready, unauthenticated 401 and documentation 404
+probes all passed after rollout. No pending Railway work remained.
