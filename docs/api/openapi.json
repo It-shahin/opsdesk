@@ -5416,13 +5416,25 @@
             "updatedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "_count": {
+              "type": "object",
+              "properties": {
+                "ticketLinks": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "ticketLinks"
+              ]
             }
           },
           "required": [
             "id",
             "name",
             "createdAt",
-            "updatedAt"
+            "updatedAt",
+            "_count"
           ]
         }
       },

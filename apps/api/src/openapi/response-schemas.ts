@@ -174,7 +174,14 @@ export const responseSchemas = {
   Message: message,
   Messages: array(message),
   Tag: object({ id: uuid, name: str, ...timestamps }),
-  Tags: array(object({ id: uuid, name: str, ...timestamps })),
+  Tags: array(
+    object({
+      id: uuid,
+      name: str,
+      ...timestamps,
+      _count: object({ ticketLinks: integer }),
+    }),
+  ),
   Member: member,
   Members: array(member),
   Invitation: invitation,

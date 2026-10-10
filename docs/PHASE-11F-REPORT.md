@@ -45,6 +45,12 @@ The first unmodified local E2E command hit its existing five-second startup-hook
 
 ## Review and deployment impact
 
+### PR #11 review corrections (2026-10-10)
+
+The local viewer now refuses known hosted-platform markers, including `VERCEL=1` and populated `VERCEL_*` variables, even when `NODE_ENV=development`. The tag-list response schema now includes the required `_count.ticketLinks` integer returned by `TagsService.list`; the generated snapshot was refreshed. No runtime service or entrypoint behavior changed.
+
+Follow-up local checks passed: API build, all three documentation safeguard tests, offline generation/check for 38 operations, required tag-count projection assertions, and an actual viewer invocation with simulated Vercel markers that exited before listening. The hosting checks are defense in depth; the viewer must never be deployed or tunneled. Hosted CI and staging rollout evidence is reported separately after these fixes are published.
+
 The change adds two direct dependencies (`@nestjs/swagger@12.0.2`, dev-only `@apidevtools/swagger-parser@13.1.0`) and their locked transitive packages. Existing dependency resolutions were preserved. API annotations add metadata and imports; a structural comparison and regression suites confirmed the existing code/validators were preserved. No Swagger compiler plugin or automatic HTTP-code rewrite is enabled.
 
 There are no database migrations or changes to authentication, tenant guards, CSRF/origin checks, CSP, runtime entrypoints, or application provider configuration. Generated build outputs already tracked in the base repository are restored and excluded from the change. Full Docker image builds remain part of hosted CI rather than being claimed as local checks.

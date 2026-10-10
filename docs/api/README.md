@@ -56,7 +56,7 @@ $env:NODE_ENV='development'
 pnpm --filter api openapi:serve
 ```
 
-Open `http://127.0.0.1:3100/docs`. JSON is at `/docs/openapi.json`. The process is separate from the API, binds only loopback, rejects non-development mode, populated `RAILWAY_*` variables and hosted environment markers, disables Try it out, and does not persist authorization. Stop it after use; do not tunnel or deploy it. No credentials are needed. Neither the staging API nor the production runtime installs these routes.
+Open `http://127.0.0.1:3100/docs`. JSON is at `/docs/openapi.json`. The process is separate from the API, binds only loopback, rejects non-development mode, populated `RAILWAY_*`/`VERCEL_*` variables and known hosted-platform markers (Vercel, Netlify, Render, Fly.io, Heroku, AWS Lambda, Azure App Service, Cloud Run and Cloudflare Pages), disables Try it out, and does not persist authorization. These checks are defense in depth, not a complete hosting detector. Stop it after use; do not tunnel or deploy it. No credentials are needed. Neither the staging API nor the production runtime installs these routes.
 
 Annotations use `@nestjs/swagger` directly without the compiler plugin's automatic HTTP-code changes. Existing guards, HTTP verbs/status behavior, DTO validators, BFF CSRF/origin checks, and CSP remain unchanged. Schema metadata does not enforce runtime authorization.
 
