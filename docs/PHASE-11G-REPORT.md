@@ -28,16 +28,18 @@ success. A local environment failure is separate from hosted CI verification.
 | Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
 | Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
 | Local PostgreSQL integration / Docker images | NOT TESTED | Docker engine unavailable; no disposable local DB/Redis. Hosted CI required |
-| Hosted CI and Docker gates | NOT TESTED | Pending release PR checks; merge prohibited until passing |
+| Hosted CI and Docker gates | PASS | [Run 38060843349](https://github.com/It-shahin/opsdesk/actions/runs/38060843349): all five jobs passed on code commit `87ba3c784666eedda586da4e95a1fea11542afa4`; final documentation head must also pass |
+| Public health / unauthenticated access / Swagger | PASS | Web health and API live/ready 200; DB/Redis up; unauthenticated tickets 401; `/docs`, `/api-docs`, `/swagger`, `/openapi.json` 404 |
 | 11G-C: desktop/mobile usability | PASS | Live desktop 1440×900 and mobile 390×844 navigation, filters and layout inspected; no mobile horizontal overflow |
-| Empty state / loading semantics | PASS | Empty workspace observed; accessible loading status added and build verified |
-| Controlled error-state browser check | NOT TESTED | Pending controlled response failure and retry verification |
+| Empty state / loading behavior | PASS | Empty workspace observed; held browser-only ticket request showed skeleton, then actual tickets; accessible loading status added |
+| Controlled error-state browser check | PASS | Browser-only synthetic 503 displayed error and Try again; removing interception and retrying restored real tickets |
 | Font regression fix | PASS | Live baseline computed Times New Roman due self-referencing font variable; local production build computes Geist/Arial fallback |
 | Keyboard access source/build | PASS | Skip link, focusable main and unnested nav added |
 | Live postdeployment keyboard check | NOT TESTED | Pending authenticated staging rollout |
 | Repeatable latency sample | PASS (limited) | Five sequential authenticated no-store BFF requests: 309, 172, 159, 170, 157 ms; median 170 ms |
 | Field Core Web Vitals / Lighthouse certification | NOT TESTED | No field dataset or DevTools audit; request timings are not LCP/INP/CLS or an SLA |
-| 11G-D: staging rollout and postrelease probes | NOT TESTED | Pending exact-commit CI, review, merge and Railway observation |
+| Safety review / staging merge | NOT TESTED | [PR #13](https://github.com/It-shahin/opsdesk/pull/13) has no inline review issues; Sourcery explicitly requests a human reviewer; confirmation pending |
+| 11G-D: staging rollout and postrelease probes | NOT TESTED | Pending final review, merge and Railway observation |
 | Production backup and restore certification | NOT TESTED | Paid backups declined; no restore drill; production release remains blocked |
 
 ## 11G-A: cause, fix and boundaries
@@ -129,7 +131,10 @@ not redesigned.
 Live checks inspected desktop and mobile navigation, filter wrapping, menu links,
 conversation/attachment layout and the empty workspace state. Mobile document
 width was 375 at a 390-pixel viewport (scrollbar accounted for), without overflow.
-The local production preview confirmed the corrected font. Authentication stays
+The local production landing preview confirmed the corrected font and no overflow
+at widths 1440 and 390. A browser-only held request showed the actual loading
+skeleton; a synthetic 503 showed the error/Retry UI, and a real refetch recovered.
+These interceptions did not change staging services or database state. Authentication stays
 with the supported Auth0 flow; local checks used inert provider placeholders.
 
 Latency samples used the existing authenticated Chrome session, sequential BFF
@@ -164,7 +169,21 @@ Desktop was installed but its daemon was unavailable; no live database was used
 as a substitute. Existing lint warnings concern an unused type/control-character
 regex in API and realtime-effect cleanup references in web.
 
+Hosted [CI run 38060843349](https://github.com/It-shahin/opsdesk/actions/runs/38060843349)
+passed on `87ba3c784666eedda586da4e95a1fea11542afa4`: API unit, API E2E,
+database integration, web and Docker images. Full Redis E2E had 199 tests passing;
+40 DB-dependent tests are intentionally skipped there and run in the separate
+PostgreSQL job: audit 22, analytics 5, demo 13, all passing. Docker runtime and
+migration targets, entrypoints, standalone web server and Compose validation passed.
+Final head checks must remain green before merge.
+
 Only the new feature branch and staging target are in scope. No production merge,
 security bypass, schema migration, paid resource, failed-job cleanup or credential
 publication is authorized here. Release notes, checklist and runbook are updated.
-Exact PR/CI/merge/deployment evidence will be added when those gates complete.
+The [release PR is #13](https://github.com/It-shahin/opsdesk/pull/13). The code diff
+was inspected for privacy, preserved retry semantics, tenant/auth boundaries and
+absence of migrations. Sourcery reported no inline issues but explicitly assessed
+the change as needing a human reviewer because logging defects could disclose
+private provider details or hide actionable failures. That final review is pending;
+CI alone is not treated as human approval. Merge/deployment evidence will be added
+after those gates complete.
