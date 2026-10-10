@@ -1,12 +1,35 @@
 # OpsDesk
 
-Multi-tenant support software for managing customers, ticket conversations, team workload, and email delivery in one workspace. Built as a TypeScript monorepo with a Next.js frontend, a NestJS API, and a separate background worker.
+**A full-stack, multi-tenant support inbox and customer CRM.** OpsDesk brings customer records, assigned tickets, internal notes, email conversations, attachments, realtime updates, and analytics into one organization-scoped workspace.
 
-[Staging app](https://opsdesk-web-staging.up.railway.app/app) · [Architecture](docs/architecture.md) · [Security](docs/security.md) · [API & OpenAPI](docs/api/README.md) · [Deployment](docs/deployment.md)
+Built as a TypeScript monorepo with a **Next.js frontend**, **NestJS API**, **PostgreSQL**, and a separately deployed **BullMQ worker**. This is a completed **staging portfolio project**, not a production SaaS offering.
 
-The staging app requires an authorized Auth0 account and workspace membership. Access details are shared privately. The screenshot below is from the actual **Northstar Support [DEMO]** workspace after Phase 11G; customer records are synthetic. Account, email and assignee identities were masked during capture. [Mobile screenshot](docs/images/phase-11g-mobile.png).
+**[View staging app](https://opsdesk-web-staging.up.railway.app/app)** · **[Project case study](docs/PORTFOLIO.md)** · **[Demo walkthrough](docs/DEMO-WALKTHROUGH.md)** · [Architecture](docs/architecture.md) · [OpenAPI](docs/api/README.md) · [Security](docs/security.md)
 
-![Actual OpsDesk staging inbox with synthetic demo tickets and closed release fixture](docs/images/phase-11g-desktop.png)
+> **Demo access:** The hosted staging workspace requires an authorized Auth0 account and organization membership. No public test credentials are provided. You can explore the real, sanitized screenshots and the walkthrough without signing in.
+
+### Inside the application
+
+![Real OpsDesk staging inbox with fictional tickets and a closed integration-test fixture; identities masked](docs/images/phase-11g-desktop.png)
+
+<details>
+<summary>View the mobile interface</summary>
+
+<img src="docs/images/phase-11g-mobile.png" alt="Real OpsDesk mobile inbox with fictional demo tickets and masked identities" width="290" />
+
+</details>
+
+## Engineering highlights
+
+| Challenge | Implementation |
+| --- | --- |
+| **Tenant security** | Auth0 sessions in a Next.js BFF, independently verified API tokens, organization-scoped queries, RBAC, and separately authorized Socket.IO rooms |
+| **Asynchronous email** | Resend inbound/outbound lifecycle, BullMQ retry behavior, webhook deduplication, worker heartbeats, and privacy-safe provider diagnostics |
+| **Responsive ticket workflows** | Customer CRM, status/priority filtering, assignments, notes, signed Cloudflare R2 attachments, analytics, and realtime reconnect recovery |
+| **Operational quality** | Five Railway staging services, readiness/queue checks, GitHub Actions CI, Docker builds, integration tests, and an offline 38-operation OpenAPI contract |
+
+**Verified on staging:** customer/ticket workflows, cross-tenant denial, two-way sandbox email, signed file upload/download, actual cross-session realtime changes, and missed-event recovery. [Read the final verification report](docs/demo/PHASE-11G-FINAL.md).
+
 
 ## Features
 
@@ -119,7 +142,7 @@ The [Phase 11G final verification](docs/demo/PHASE-11G-FINAL.md) records the com
 
 The [Phase 11E report](docs/demo/FINAL-VERIFICATION.md) remains the historical seed baseline: 8 customers, 12 tickets, 5 tags, and 48 messages. Phase 11G added a separately named disposable customer/ticket and messages; baseline counts are not a claim about today's mutable workspace. Staging uses Resend's development sender and an approved test recipient. Arbitrary customer delivery requires a verified sending domain and a new controlled check. See [release notes](docs/RELEASE-NOTES.md) and the [production checklist](docs/PRODUCTION-READINESS.md).
 
-Other boundaries: invitation links are returned for manual sharing; no automated invitation email workflow is claimed. OpenAPI does not model Socket.IO events or all business rules. The attachment pipeline checks policy and object metadata but does not implement malware scanning. Backup restoration and production readiness have not been certified by this staging exercise. Review the exact diff and passing CI before a staging merge. Production/default-branch release requires separate authorization.
+Other boundaries: invitation links are returned for manual sharing; no automated invitation email workflow is claimed. OpenAPI does not model Socket.IO events or all business rules. The attachment pipeline checks policy and object metadata but does not implement malware scanning. Backup restoration and production readiness have not been certified by this staging exercise. GitHub's public `master` branch is the portfolio source; Railway staging is deployed separately from `feat/phase-11-deployment`. Changes to `master` do not authorize a production deployment.
 
 ## Repository guide
 
@@ -130,4 +153,6 @@ Other boundaries: invitation links are returned for manual sharing; no automated
 | `apps/api/src/worker.ts` | Separate queue worker entrypoint |
 | `apps/api/prisma` | Schema and committed database migrations |
 | `apps/api/scripts` | Offline OpenAPI generation and local viewer safeguards |
+| `docs/PORTFOLIO.md` | Project case study, CV and LinkedIn-ready summaries, engineering decisions |
+| `docs/DEMO-WALKTHROUGH.md` | 2–3 minute demo storyboard, recording guidance and reviewer checklist |
 | `docs` | Architecture, security, API workflows, deployment, operations, demo verification |
