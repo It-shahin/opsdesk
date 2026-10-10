@@ -149,6 +149,8 @@ export function RealtimeProvider({
       false,
     );
 
+  const hasRecovered = useRef(false);
+
   const socketRef =
     useRef<
       RealtimeSocket |
@@ -283,6 +285,16 @@ export function RealtimeProvider({
                   .add(
                     organizationId,
                   );
+                if (hasRecovered.current) {
+                  // Subscribe before refetching so writes in the recovery gap
+                  // are covered by either the snapshot or a subsequent event.
+                  void queryClient.invalidateQueries({
+                    predicate: ({ queryKey }) =>
+                      queryKey[1] === organizationId &&
+                      ['tickets', 'ticket', 'customer-tickets', 'analytics']
+                        .includes(String(queryKey[0])),
+                  });
+                }
               },
             )
             .finally(
@@ -304,7 +316,7 @@ export function RealtimeProvider({
 
         return promise;
       },
-      [],
+      [queryClient],
     );
 
   const leaveOrganization =
@@ -472,6 +484,13 @@ export function RealtimeProvider({
                   .add(
                     key,
                   );
+                if (hasRecovered.current) {
+                  // Delivery updates use ticket rooms, so reconcile after this
+                  // ACK too rather than relying on the organization snapshot.
+                  void queryClient.invalidateQueries({
+                    queryKey: ['ticket-messages', organizationId, ticketId],
+                  });
+                }
               },
             )
             .finally(
@@ -495,6 +514,7 @@ export function RealtimeProvider({
       },
       [
         joinOrganization,
+        queryClient,
       ],
     );
 
@@ -670,8 +690,10 @@ export function RealtimeProvider({
           if (
             hasConnected.current
           ) {
+            hasRecovered.current = true;
             toast.success(
               'Realtime connection restored',
+              { id: 'realtime-restored' },
             );
           }
 

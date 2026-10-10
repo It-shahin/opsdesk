@@ -530,6 +530,15 @@ export class EmailWorker
           ? error.name
           : 'UnknownEmailError';
 
+      if (error instanceof EmailProviderError && error.diagnostic) {
+        this.logger.error(JSON.stringify({
+          event: 'email.provider.failed',
+          ...error.diagnostic,
+          retryable: error.retryable,
+          finalAttempt: !retryable || thisWasFinalAttempt,
+        }));
+      }
+
       if (
         !retryable ||
         thisWasFinalAttempt

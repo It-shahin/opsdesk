@@ -60,6 +60,12 @@ The API samples `email` and `maintenance` queues every 30 seconds, starting 30
 seconds after bootstrap. `QueueHealth` emits `queue.health` with only queue name,
 state counts, paused flag, waiting backlog, and number of fresh worker instances.
 There are no job payloads or customer identifiers in these monitoring events.
+`consumerStatus` reports worker/pause/backlog health independently of retained
+failures. `retainedFailures` equals the failed-job count. `retainedFailureTrend`
+is `baseline` after process startup, then `increased`, `unchanged`, or `decreased`
+relative to the previous successful sample. Probe failures do not replace that
+baseline. This is a net count trend, not a failure rate: retention can remove jobs
+between samples, and a restart resets the in-memory baseline.
 
 | Signal | Meaning | First action |
 | --- | --- | --- |
@@ -69,6 +75,8 @@ There are no job payloads or customer identifiers in these monitoring events.
 | `status=degraded`, `paused=true` | queue is paused | determine why before deliberately resuming it |
 | `status=degraded`, `backlog>=100` | at least 100 waiting jobs | check consumer capacity, slow jobs, and provider limits |
 | `status=degraded`, `counts.failed>0` | failed jobs retained in BullMQ | correlate with worker failure events and delivery state |
+| `consumerStatus=up`, `retainedFailureTrend=unchanged` | consumption healthy with stable retained history | inspect timestamps before deciding whether an incident is current |
+| `retainedFailureTrend=increased` | net retained failure count grew | correlate with new failure events; do not infer a precise rate |
 | `worker.heartbeat.failed` | heartbeat publication failed | check Redis and worker connection state |
 
 Each worker writes a heartbeat every 15 seconds only for consumers whose run loop
@@ -113,6 +121,20 @@ failure events. Check provider outages/rate limits and the database delivery sta
 before any manual retry; prevent duplicate customer messages. Preserve queues and
 use the existing delivery recovery flow rather than generating replacement jobs.
 Restart the worker once the cause is repaired and verify both queue heartbeats.
+
+`email.provider.failed` includes an allowlisted `providerCode`, HTTP
+`providerStatus` (400–599 or null), `retryable`, and `finalAttempt`. It deliberately
+omits the raw provider message, recipient, body, credentials, signed URLs, and
+job payload. Unknown provider codes become `unknown_provider_error`. Use private
+provider logs for the exact cause; a generic `validation_error` alone is not a
+domain/DNS diagnosis. Existing retry/idempotency decisions remain unchanged.
+
+Resend's development sender permits delivery only to the account's own approved
+test address. A 403 sandbox rejection is permanent and must not be blindly
+replayed. A verified sending domain is required for arbitrary recipients. Keep
+historical failed jobs as evidence; any intentional removal/replay needs a
+separately scoped decision and duplicate-send assessment. See the redacted
+[Phase 11G evidence](../PHASE-11G-REPORT.md).
 
 ### Web healthy but requests or login fail
 

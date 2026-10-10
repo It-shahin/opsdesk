@@ -96,6 +96,58 @@ describe('Queue monitoring', () => {
     expect(error).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps retained failures visible while distinguishing healthy consumption and count trends', async () => {
+    getQueueSnapshot.mockResolvedValue({
+      counts: { failed: 4 },
+      paused: false,
+    });
+    await service.sample();
+    expect(JSON.parse(String(warn.mock.calls[0]![0]))).toMatchObject({
+      status: 'degraded',
+      consumerStatus: 'up',
+      retainedFailures: 4,
+      retainedFailureTrend: 'baseline',
+    });
+    await service.sample();
+    expect(
+      JSON.parse(String(warn.mock.calls[2]![0])).retainedFailureTrend,
+    ).toBe('unchanged');
+    getQueueSnapshot.mockResolvedValue({
+      counts: { failed: 5 },
+      paused: false,
+    });
+    await service.sample();
+    expect(
+      JSON.parse(String(warn.mock.calls[4]![0])).retainedFailureTrend,
+    ).toBe('increased');
+    getQueueSnapshot.mockResolvedValue({
+      counts: { failed: 3 },
+      paused: false,
+    });
+    await service.sample();
+    expect(
+      JSON.parse(String(warn.mock.calls[6]![0])).retainedFailureTrend,
+    ).toBe('decreased');
+  });
+
+  it('preserves the previous successful count when a dependency probe fails', async () => {
+    getQueueSnapshot.mockResolvedValue({
+      counts: { failed: 4 },
+      paused: false,
+    });
+    await service.sample();
+    getQueueSnapshot.mockRejectedValue(new Error('private Redis connection'));
+    await service.sample();
+    getQueueSnapshot.mockResolvedValue({
+      counts: { failed: 5 },
+      paused: false,
+    });
+    await service.sample();
+    expect(
+      JSON.parse(String(warn.mock.calls[2]![0])).retainedFailureTrend,
+    ).toBe('increased');
+  });
+
   it('redacts dependency error messages', async () => {
     getQueueSnapshot.mockRejectedValue(
       new Error('redis://private:SECRET@host PRIVATE_CUSTOMER'),

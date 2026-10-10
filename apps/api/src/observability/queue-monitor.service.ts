@@ -23,6 +23,7 @@ export class QueueMonitorService
   private readonly logger = new Logger('QueueHealth');
   private timer?: NodeJS.Timeout;
   private sampling = false;
+  private readonly previousFailedCounts = new Map<string, number>();
 
   constructor(
     private readonly config: ConfigService,
@@ -60,6 +61,25 @@ export class QueueMonitorService
               ]),
             );
             const backlog = counts.waiting ?? 0;
+            const retainedFailures = counts.failed ?? 0;
+            const previousFailed = this.previousFailedCounts.get(queue);
+            const retainedFailureTrend =
+              previousFailed === undefined
+                ? 'baseline'
+                : retainedFailures > previousFailed
+                  ? 'increased'
+                  : retainedFailures < previousFailed
+                    ? 'decreased'
+                    : 'unchanged';
+            this.previousFailedCounts.set(queue, retainedFailures);
+            // Consumption health is separate from retained failure history.
+            // A count trend is not a failure rate: retention can remove jobs.
+            const consumerStatus =
+              workersAlive === 0
+                ? 'down'
+                : paused || backlog >= BACKLOG_WARNING_COUNT
+                  ? 'degraded'
+                  : 'up';
             const status =
               workersAlive === 0
                 ? 'down'
@@ -76,6 +96,9 @@ export class QueueMonitorService
               paused,
               backlog,
               workersAlive,
+              consumerStatus,
+              retainedFailures,
+              retainedFailureTrend,
             });
             if (status === 'up') this.logger.log(event);
             else this.logger.warn(event);

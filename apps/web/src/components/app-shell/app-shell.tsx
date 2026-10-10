@@ -119,6 +119,12 @@ export function AppShell({
     <div
       className="min-h-screen bg-muted/20"
     >
+      <a
+        href="#workspace-content"
+        className="sr-only fixed left-3 top-3 z-50 rounded-md bg-background px-4 py-2 text-sm shadow focus:not-sr-only"
+      >
+        Skip to workspace content
+      </a>
       <div
         className="flex min-h-screen"
       >
@@ -167,7 +173,7 @@ export function AppShell({
             />
           </div>
 
-          <nav
+          <div
             className="flex-1 p-3"
           >
             <AppNavigation
@@ -175,7 +181,7 @@ export function AppShell({
                 organizationId
                 }
             />
-          </nav>
+          </div>
 
           <div
             className="border-t p-4 text-xs text-muted-foreground"
@@ -301,6 +307,8 @@ export function AppShell({
           </header>
 
           <main
+            id="workspace-content"
+            tabIndex={-1}
             className="flex-1 p-4 sm:p-6 lg:p-8"
           >
             {children}

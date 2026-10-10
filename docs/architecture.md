@@ -34,7 +34,9 @@ Modules separate customers, tickets/messages, tags, team/invitations, attachment
 
 Public replies to customers with an email address persist outbound delivery state and enqueue work on BullMQ's `email` queue. Internal notes do not send email. The worker calls Resend and records delivery results. Signed webhook events reconcile delivery status and ingest inbound mail; deduplication prevents repeated event handling. Recovery reconciles pending delivery records with queued work.
 
-The `maintenance` queue schedules cleanup tasks for attachments. Both consumers publish heartbeats. API queue health sampling reports backlog, retained failures, pause state, and fresh consumers. API readiness checks PostgreSQL/Redis availability, independently of worker and provider health. See [the runbook](operations/runbook.md) for signal meanings and recovery precautions.
+The `maintenance` queue schedules cleanup tasks for attachments. Both consumers publish heartbeats. API queue health sampling reports backlog, retained failures, pause state, and fresh consumers. `consumerStatus` separates worker/pause/backlog health from retained failure history; the overall degraded warning remains visible. `retainedFailureTrend` compares successful samples in memory and resets on process restart. A net count trend is not a failure rate. API readiness checks PostgreSQL/Redis availability, independently of worker and provider health. See [the runbook](operations/runbook.md) for signal meanings and recovery precautions.
+
+Provider errors pass through an allowlist before diagnostic logging. The email service attaches only a documented code and bounded HTTP status; the worker logs those plus retry/final-attempt flags before BullMQ wraps a permanent failure. Raw provider responses stay out of application diagnostic events because they can contain recipients or secrets. This improves diagnosis without changing retry, idempotency or authorization decisions.
 
 ## Attachments
 
@@ -44,7 +46,9 @@ The API authorizes an upload against a tenant-owned ticket, validates type/size 
 
 Socket.IO uses namespace `/realtime`. The connection verifies an Auth0 access token and joins a user room. Organization and ticket room joins validate UUIDs and membership; a ticket join re-resolves membership/permissions and requires the organization to have been joined first. Leaving an organization also leaves its ticket rooms.
 
-Redis's Socket.IO adapter and emitter allow API and worker instances to publish updates across instances. The web client invalidates/refetches relevant query data on ticket, message, and delivery events. A live connection alone does not prove that all event paths delivered successfully; staging verification observed the Live indicator without making writes. [Event contract](api/README.md#socketio-events).
+Redis's Socket.IO adapter and emitter allow API and worker instances to publish updates across instances. The web client invalidates/refetches relevant query data on ticket, message, and delivery events. A live connection alone does not prove propagation. [Phase 11G](PHASE-11G-REPORT.md) observed ticket creation, notes, an attachment and an actual inbound reply reaching an open owner session without reload. [Event contract](api/README.md#socketio-events).
+
+After reconnecting, the client waits for the authorized organization-room join acknowledgment before refreshing active realtime-backed ticket lists/details, customer ticket histories and analytics for that organization, marking their inactive caches stale. Other workspaces and customer/team/settings queries are excluded. Ticket-message data is reconciled separately after a successful ticket-room acknowledgment. Subscribing before reading a fresh snapshot covers writes during the reconnect gap. A denied organization join triggers no recovery fetch; a denied ticket join adds no message refresh, although the preceding successful organization acknowledgment can already have refreshed its permitted ticket metadata. Every refetch still passes API authorization. The initial connection avoids this extra refresh. A stable recovery notification ID prevents repeated reconnects from accumulating notices. This restores data consistency after interruption; it does not guarantee uninterrupted transport.
 
 ## Analytics
 
