@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsIn,
@@ -16,44 +17,57 @@ function trimOptional(value: unknown) {
 
   const trimmed = value.trim();
 
-  return trimmed.length > 0
-    ? trimmed
-    : undefined;
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 export class ListCustomersDto {
-  @IsIn([
-    'active',
-    'archived',
-    'all',
-  ])
-  status:
-    | 'active'
-    | 'archived'
-    | 'all' = 'active';
+  @ApiProperty({
+    type: String,
+    required: false,
+    enum: ['active', 'archived', 'all'],
+    default: 'active',
+  })
+  @IsIn(['active', 'archived', 'all'])
+  status: 'active' | 'archived' | 'all' = 'active';
 
+  @ApiProperty({ type: 'integer', required: false, minimum: 1, default: 1 })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page = 1;
 
+  @ApiProperty({
+    type: 'integer',
+    required: false,
+    minimum: 1,
+    maximum: 100,
+    default: 20,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
   limit = 20;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 120,
+  })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(120)
   search?: string;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 120,
+  })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(120)

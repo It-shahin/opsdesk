@@ -1,4 +1,7 @@
-import type { NextConfig } from 'next';
+import path from 'node:path';
+import type {
+  NextConfig,
+} from 'next';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const realtimeOrigin = new URL(
@@ -43,7 +46,16 @@ const securityHeaders = [
     : []),
 ];
 
-const nextConfig: NextConfig = {
+const nextConfig:
+  NextConfig = {
+  output:
+    'standalone',
+
+  outputFileTracingRoot:
+    path.resolve(
+      process.cwd(),
+      '../..',
+    ),
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

@@ -27,6 +27,7 @@ import { AnalyticsModule } from './analytics/analytics.module.js';
 import { SecurityModule } from './security/security.module.js';
 import { ObservabilityModule } from './observability/observability.module.js';
 import { HealthModule } from './health/health.module.js';
+import { QueueMonitoringModule } from './observability/queue-monitoring.module.js';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { HealthModule } from './health/health.module.js';
   SecurityModule,
   ObservabilityModule,
   HealthModule,
+  QueueMonitoringModule,
 ],
   controllers: [AppController],
   providers: [AppService],

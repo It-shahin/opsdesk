@@ -1,0 +1,396 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+      - feat/phase-11-deployment
+
+  push:
+    branches:
+      - master
+      - feat/phase-11-deployment
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.15.1"
+
+
+jobs:
+  # ==================================================
+  # API unit / static checks
+  # ==================================================
+
+  api-unit:
+    name: API unit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Prisma schema
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/opsdesk
+        run: pnpm exec prisma validate --config prisma7.config.ts
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/opsdesk
+        run: pnpm exec prisma generate --config prisma7.config.ts
+
+      - name: Verify generated Prisma client is committed
+        run: git diff --exit-code -- apps/api/src/generated/prisma
+
+      - name: Lint API
+        run: pnpm --filter api lint
+
+      - name: Build API
+        run: pnpm --filter api build
+
+      - name: Verify local documentation safeguards
+        run: pnpm --filter api test:openapi
+
+      - name: Validate OpenAPI and detect documentation drift
+        run: pnpm --filter api openapi:check
+
+      - name: Run API unit tests
+        run: pnpm --filter api test
+
+
+  # ==================================================
+  # API E2E + realtime + security
+  # ==================================================
+
+  api-e2e:
+    name: API E2E
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+
+        ports:
+          - 6379:6379
+
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/opsdesk
+      AUTH0_ISSUER_BASE_URL: https://example.auth0.com
+      AUTH0_AUDIENCE: https://api.opsdesk.test
+      R2_ENDPOINT: https://example.r2.cloudflarestorage.com
+      R2_BUCKET: ci-test
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      RESEND_API_KEY: re_ci_placeholder
+      RESEND_INBOUND_API_KEY: re_ci_placeholder
+      RESEND_WEBHOOK_SECRET: whsec_Y2ktcGxhY2Vob2xkZXI=
+      EMAIL_FROM_NAME: CI Test
+      EMAIL_FROM_ADDRESS: test@example.invalid
+      EMAIL_INBOUND_DOMAIN: inbound.example.invalid
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/opsdesk
+        run: pnpm exec prisma generate --config prisma7.config.ts
+
+      - name: Run API E2E tests
+        run: pnpm --filter api test:e2e
+
+
+  # ==================================================
+  # Real PostgreSQL integration tests
+  # ==================================================
+
+  database:
+    name: Database integration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+
+        env:
+          POSTGRES_DB: opsdesk_ci
+          POSTGRES_USER: opsdesk
+          POSTGRES_PASSWORD: opsdesk_ci
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U opsdesk -d opsdesk_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://opsdesk:opsdesk_ci@127.0.0.1:5432/opsdesk_ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: pnpm exec prisma generate --config prisma7.config.ts
+
+      - name: Verify production migrations can deploy
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy --config prisma7.config.ts
+
+      - name: Run audit database tests
+        run: pnpm --filter api test:audit:db
+
+      - name: Run analytics database tests
+        run: pnpm --filter api test:analytics:db
+
+      - name: Run demo database tests
+        env:
+          DEMO_TEST_DATABASE_URL: postgresql://opsdesk:opsdesk_ci@127.0.0.1:5432/opsdesk_ci
+        run: pnpm --filter api test:demo:db
+
+
+  # ==================================================
+  # Next.js frontend
+  # ==================================================
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+
+    env:
+      APP_BASE_URL: http://localhost:3000
+
+      API_SERVER_URL: http://127.0.0.1:3001
+
+      AUTH0_DOMAIN: https://ci.example.auth0.com
+      AUTH0_CLIENT_ID: ci-client-id
+      AUTH0_CLIENT_SECRET: ci-client-secret
+
+      AUTH0_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+      AUTH0_AUDIENCE: https://api.opsdesk.dev
+
+      NEXT_PUBLIC_REALTIME_URL: http://localhost:3001
+
+      NEXT_PUBLIC_R2_ORIGIN: https://example.r2.cloudflarestorage.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Web
+        run: pnpm --filter web lint
+
+      - name: Run Web auth tests
+        run: pnpm --filter web test:auth
+
+      - name: Run Web security tests
+        run: pnpm --filter web test:security
+
+      - name: Build Web
+        run: pnpm --filter web build
+
+
+  # ==================================================
+  # Production Docker image verification
+  # ==================================================
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+
+    needs:
+      - api-unit
+      - api-e2e
+      - database
+      - web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+
+      # ------------------------------
+      # API runtime image
+      # ------------------------------
+
+      - name: Build API runtime image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runtime
+
+          push: false
+          load: true
+
+          tags: opsdesk-api:ci
+
+          cache-from: type=gha,scope=api-runtime
+          cache-to: type=gha,mode=max,scope=api-runtime
+
+
+      - name: Verify API runtime entrypoints
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            opsdesk-api:ci \
+            -c "test -f dist/main.js && test -f dist/worker.js"
+
+
+      # ------------------------------
+      # Migration target
+      # ------------------------------
+
+      - name: Build migration image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: migrate
+
+          push: false
+
+          tags: opsdesk-migrate:ci
+
+          cache-from: type=gha,scope=api-migrate
+          cache-to: type=gha,mode=max,scope=api-migrate
+
+
+      # ------------------------------
+      # Web runtime image
+      # ------------------------------
+
+      - name: Build Web runtime image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runtime
+
+          push: false
+          load: true
+
+          tags: opsdesk-web:ci
+
+          build-args: |
+            APP_BASE_URL=http://localhost:3000
+            AUTH0_AUDIENCE=https://api.opsdesk.dev
+            NEXT_PUBLIC_REALTIME_URL=http://localhost:3001
+            NEXT_PUBLIC_R2_ORIGIN=https://example.r2.cloudflarestorage.com
+
+          cache-from: type=gha,scope=web-runtime
+          cache-to: type=gha,mode=max,scope=web-runtime
+
+
+      - name: Verify Web standalone server
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            opsdesk-web:ci \
+            -c "test -f apps/web/server.js"
+
+
+      # ------------------------------
+      # Compose syntax
+      # ------------------------------
+
+      - name: Validate Docker Compose
+        env:
+          POSTGRES_PASSWORD: ci-password
+          NEXT_PUBLIC_R2_ORIGIN: https://example.r2.cloudflarestorage.com
+        run: |
+          touch apps/api/.env
+          touch apps/web/.env.local
+
+          docker compose \
+            -f compose.docker.yml \
+            config > /dev/null

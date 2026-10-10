@@ -1,0 +1,249 @@
+name: opsdesk
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: opsdesk
+      POSTGRES_USER: opsdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U opsdesk -d opsdesk"
+        ]
+
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - backend
+
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes"
+      ]
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - backend
+
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+
+    environment:
+      DATABASE_URL: postgresql://opsdesk:${POSTGRES_PASSWORD}@postgres:5432/opsdesk
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: "no"
+
+    networks:
+      - backend
+
+
+  api:
+    image: opsdesk-api:local
+
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+
+    init: true
+    restart: unless-stopped
+
+    env_file:
+      - ./apps/api/.env
+
+    environment:
+      NODE_ENV: ${API_NODE_ENV:-development}
+
+      PORT: 3001
+
+      WEB_ORIGIN: ${APP_BASE_URL:-http://localhost:3000}
+
+      DATABASE_URL: postgresql://opsdesk:${POSTGRES_PASSWORD}@postgres:5432/opsdesk
+
+      REDIS_URL: redis://redis:6379
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+      redis:
+        condition: service_healthy
+
+    ports:
+      - "3001:3001"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+    stop_grace_period: 30s
+
+    networks:
+      - backend
+
+
+  worker:
+    image: opsdesk-api:local
+
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+
+    command:
+      [
+        "node",
+        "dist/worker.js"
+      ]
+
+    init: true
+    restart: unless-stopped
+
+    env_file:
+      - ./apps/api/.env
+
+    environment:
+      NODE_ENV: ${API_NODE_ENV:-development}
+
+      WEB_ORIGIN: ${APP_BASE_URL:-http://localhost:3000}
+
+      DATABASE_URL: postgresql://opsdesk:${POSTGRES_PASSWORD}@postgres:5432/opsdesk
+
+      REDIS_URL: redis://redis:6379
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+      redis:
+        condition: service_healthy
+
+    stop_grace_period: 30s
+
+    networks:
+      - backend
+
+
+  web:
+    image: opsdesk-web:local
+
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runtime
+
+      args:
+        APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+
+        AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.opsdesk.dev}
+
+        NEXT_PUBLIC_REALTIME_URL: ${NEXT_PUBLIC_REALTIME_URL:-http://localhost:3001}
+
+        NEXT_PUBLIC_R2_ORIGIN: ${NEXT_PUBLIC_R2_ORIGIN}
+
+    init: true
+    restart: unless-stopped
+
+    env_file:
+      - ./apps/web/.env.local
+
+    environment:
+      NODE_ENV: production
+
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+
+      API_SERVER_URL: http://api:3001
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    ports:
+      - "3000:3000"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+    stop_grace_period: 30s
+
+    networks:
+      - backend
+
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
+networks:
+  backend:

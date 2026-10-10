@@ -162,6 +162,14 @@ export class EmailWorker
     );
   }
 
+  isHealthy(): boolean {
+    return (
+      this.connection.status === 'ready' &&
+      !!this.worker?.isRunning() &&
+      !this.worker.isPaused()
+    );
+  }
+
   private async processJob(
     job:
       Job,

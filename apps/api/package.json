@@ -8,6 +8,10 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
+    "demo:seed": "node dist/demo/seed-demo.js",
+    "demo:validate": "node dist/demo/seed-demo.js --action validate",
+    "demo:reset": "node dist/demo/seed-demo.js --action reset",
+    "test:demo:db": "cross-env DEMO_DATABASE_TESTS=1 NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand demo-database.e2e-spec.ts",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start --entryFile main.js",
@@ -26,7 +30,12 @@
     "dev": "nest start --watch --entryFile main.js",
     "contract:emit": "prisma contract emit",
     "dev:worker": "nest start --watch --entryFile worker.js",
-    "start:worker": "node dist/worker.js"
+    "start:worker": "node dist/worker.js",
+    "migrate:deploy": "prisma migrate deploy --config prisma7.config.ts",
+    "openapi:generate": "node scripts/openapi.mjs generate",
+    "openapi:check": "node scripts/openapi.mjs check",
+    "openapi:serve": "node scripts/openapi.mjs serve",
+    "test:openapi": "node --test scripts/openapi-policy.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1137.0",
@@ -36,6 +45,7 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/platform-socket.io": "^12.1.2",
+    "@nestjs/swagger": "12.0.2",
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/websockets": "^12.1.2",
     "@prisma/adapter-pg": "7.10.0",
@@ -50,6 +60,7 @@
     "ioredis": "^6.0.0",
     "jose": "^6.2.12",
     "pg": "^8.23.0",
+    "prisma": "7.10.0",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.30.0",
     "rxjs": "^7.8.1",
@@ -57,6 +68,7 @@
     "zod": "^4.6.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
     "@jest/globals": "30.5.1",
     "@nestjs/cli": "^12.0.0",
     "@nestjs/mau": "^0.2.6",
@@ -71,7 +83,6 @@
     "jest": "30.5.1",
     "oxlint": "^1.58.0",
     "prettier": "^3.4.2",
-    "prisma": "7.10.0",
     "socket.io-client": "^4.8.4",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",

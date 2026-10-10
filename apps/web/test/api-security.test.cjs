@@ -137,7 +137,7 @@ function load(file, mocks = {}, fetch, env = defaultEnv) {
         if (!(name in mocks)) throw new Error(`Unexpected import: ${name}`);
         return mocks[name];
       },
-      process: { env },
+      process: { env, cwd: () => path.join(__dirname, '..') },
       Headers,
       URL,
       fetch,
@@ -469,7 +469,7 @@ test('active organization rejects CSRF before reading the session or changing co
 
 for (const NODE_ENV of ['development', 'production']) {
   test(`${NODE_ENV} browser policy allows realtime/R2 and sets expected security headers`, async () => {
-    const config = load('next.config.ts', {}, undefined, {
+    const config = load('next.config.ts', { 'node:path': { default: path } }, undefined, {
       NODE_ENV,
       NEXT_PUBLIC_REALTIME_URL: 'https://realtime.example.test/socket',
       NEXT_PUBLIC_R2_ORIGIN: 'https://account.r2.cloudflarestorage.com/bucket',
@@ -519,7 +519,7 @@ for (const NODE_ENV of ['development', 'production']) {
 }
 
 test('development browser policy works before optional public URLs are configured', async () => {
-  const config = load('next.config.ts', {}, undefined, {
+  const config = load('next.config.ts', { 'node:path': { default: path } }, undefined, {
     NODE_ENV: 'development',
   }).default;
   const csp = (await config.headers())[0].headers.find(

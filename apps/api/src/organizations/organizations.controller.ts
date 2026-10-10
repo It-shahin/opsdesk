@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -16,6 +17,7 @@ import { UsersService } from '../users/users.service.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { OrganizationsService } from './organizations.service.js';
 
+@ApiResource('Organizations')
 @Controller('v1/organizations')
 export class OrganizationsController {
   constructor(
@@ -23,6 +25,7 @@ export class OrganizationsController {
     private readonly usersService: UsersService,
   ) {}
 
+  @ApiResult('Organization')
   @Post()
   @Throttle({
     default: {
@@ -46,6 +49,7 @@ export class OrganizationsController {
     );
   }
 
+  @ApiResult('Organizations')
   @Get()
   async list(
     @Req() request: AuthenticatedRequest,
@@ -60,6 +64,7 @@ export class OrganizationsController {
     );
   }
 
+  @ApiResult('Organization')
   @Get(':organizationId')
   @UseGuards(TenantMembershipGuard)
   async getOne(

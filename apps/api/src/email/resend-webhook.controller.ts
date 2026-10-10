@@ -1,3 +1,5 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
+import { ApiBody } from '@nestjs/swagger';
 import {
   BadRequestException,
   Controller,
@@ -35,6 +37,7 @@ import {
   ResendWebhookVerificationService,
 } from './resend-webhook-verification.service.js';
 
+@ApiResource('Webhooks')
 @Controller(
   'v1/webhooks/resend',
 )
@@ -50,6 +53,24 @@ export class ResendWebhookController {
       ResendWebhookVerificationService,
   ) {}
 
+  @ApiResult('Webhook')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['type', 'data'],
+      properties: {
+        type: {
+          type: 'string',
+          description: 'email.received or supported outbound email lifecycle event; unsupported types are acknowledged and ignored.',
+        },
+        data: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'Resend event data. email.received requires email_id (string), from (string), and to (array). Outbound events require email_id and correlation tags where applicable.',
+        },
+      },
+    },
+  })
   @Public()
   @Post()
   @HttpCode(200)
