@@ -206,6 +206,11 @@ jobs:
       - name: Run analytics database tests
         run: pnpm --filter api test:analytics:db
 
+      - name: Run demo database tests
+        env:
+          DEMO_TEST_DATABASE_URL: postgresql://opsdesk:opsdesk_ci@127.0.0.1:5432/opsdesk_ci
+        run: pnpm --filter api test:demo:db
+
 
   # ==================================================
   # Next.js frontend
