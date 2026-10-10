@@ -48,6 +48,8 @@ Socket.IO uses namespace `/realtime`. The connection verifies an Auth0 access to
 
 Redis's Socket.IO adapter and emitter allow API and worker instances to publish updates across instances. The web client invalidates/refetches relevant query data on ticket, message, and delivery events. A live connection alone does not prove propagation. [Phase 11G](PHASE-11G-REPORT.md) observed ticket creation, notes, an attachment and an actual inbound reply reaching an open owner session without reload. [Event contract](api/README.md#socketio-events).
 
+After reconnecting, the client waits for the authorized organization-room join acknowledgment before refreshing active queries and marking inactive caches stale. Ticket-message data is reconciled again after the ticket-room acknowledgment. Subscribing before reading a fresh snapshot covers writes during the reconnect gap; a denied join triggers no recovery fetch. The initial connection avoids this extra refresh. A stable recovery notification ID prevents repeated reconnects from accumulating notices. This restores data consistency after interruption; it does not guarantee uninterrupted transport.
+
 ## Analytics
 
 The overview uses UTC day buckets for `7d`, `30d`, or `90d`. Current totals/status/priority distributions and active workload are snapshots; created/resolved trends and period email metrics use the requested range. They should not be interpreted as identical time scopes. Resolution counts include the applicable resolved/closed lifecycle records. Analytics queries and audit pagination remain tenant-scoped.
