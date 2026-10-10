@@ -11,8 +11,10 @@ Date: 2026-10-10. Target: `feat/phase-11-deployment` only.
 - Fixed the self-referencing font variable that caused a serif fallback.
 - Added a workspace skip link, a focusable main and accessible loading status;
   removed a redundant nested navigation landmark.
-- Reconnect follow-up refreshes data that may have changed while offline and
-  replaces repeated recovery notifications with one stable notification ID.
+- Reconnect recovery refreshes data after authorized organization/ticket room
+  acknowledgments, covering missed events and writes during the rejoin gap;
+  refreshes are scoped to the rejoined workspace's realtime queries, and message
+  recovery waits for the ticket-room ACK. Repeated notices share one stable ID.
 - Added live integration evidence, a production checklist and updated operational
   guidance. No database migration or provider configuration change.
 

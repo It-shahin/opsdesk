@@ -2,8 +2,10 @@
 
 Verification date: **2026-10-10 UTC**. Source baseline:
 `aa2259b5dd029735d5378f9cd880bd07b76bf2db` (merged Phase 11F PR #11).
-Release branch: `feat/phase-11-release`; target: `feat/phase-11-deployment`.
-Scope is staging portfolio release, **not production certification**.
+Release branches: `feat/phase-11-release`, `feat/phase-11-release-verification`
+and `feat/phase-11-final-report`; target: `feat/phase-11-deployment`.
+Status: **staging portfolio complete**, with the scoped limitations below;
+**not production-ready**. [Concise final verification](demo/PHASE-11G-FINAL.md).
 
 ## Release matrix
 
@@ -23,24 +25,25 @@ success. A local environment failure is separate from hosted CI verification.
 | R2 lifecycle | PASS | Init 200, signed PUT 200, complete 200, note link 201, authorized signed GET 200, exact 70-byte content match |
 | API unit regression | PASS | 44 suites / 445 tests locally, including safe diagnostics and retained count trends |
 | Security E2E | PASS | 26 tests locally; synthetic auth/RBAC/tenancy/CSRF/rate-limit coverage |
-| Web auth / security | PASS | 11 auth and 48 security/recovery tests locally (44 on primary release plus 4 follow-up recovery regressions) |
+| Web auth / security | PASS | 11 auth and 50 security/recovery tests locally (44 baseline plus 6 recovery/scope regressions); the PR #14 runtime snapshot used 48 |
 | API/web lint and builds | PASS | Both pass; 2 existing lint warnings per app; no new errors |
 | Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
 | Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
 | Local PostgreSQL integration / Docker images | NOT TESTED | Docker engine unavailable; no disposable local DB/Redis. Hosted CI required |
-| Hosted CI and Docker gates | PASS | [Run 38060843349](https://github.com/It-shahin/opsdesk/actions/runs/38060843349): all five jobs passed on code commit `87ba3c784666eedda586da4e95a1fea11542afa4`; final documentation head must also pass |
+| Hosted CI and Docker gates | PASS | Primary code/documentation runs and recovery exact-head [run 38062892907](https://github.com/It-shahin/opsdesk/actions/runs/38062892907) passed all five jobs; merge push run 38063542294 passed before rollout |
 | Public health / unauthenticated access / Swagger | PASS | Web health and API live/ready 200; DB/Redis up; unauthenticated tickets 401; `/docs`, `/api-docs`, `/swagger`, `/openapi.json` 404 |
 | 11G-C: desktop/mobile usability | PASS | Live desktop 1440×900 and mobile 390×844 navigation, filters and layout inspected; no mobile horizontal overflow |
 | Empty state / loading behavior | PASS | Empty workspace observed; held browser-only ticket request showed skeleton, then actual tickets; accessible loading status added |
 | Controlled error-state browser check | PASS | Browser-only synthetic 503 displayed error and Try again; removing interception and retrying restored real tickets |
-| Font regression fix | PASS | Live baseline computed Times New Roman due self-referencing font variable; local production build computes Geist/Arial fallback |
+| Font regression fix | PASS | Live baseline computed Times New Roman due self-referencing font variable; local build and deployed staging now compute Geist with explicit fallbacks |
 | Keyboard access source/build | PASS | Skip link, focusable main and unnested nav added |
 | Live postdeployment keyboard check | PASS | Actual Tab focused visible skip link, Enter focused main; computed Geist font and zero nested nav landmarks |
 | Repeatable latency sample | PASS (limited) | Five sequential authenticated no-store BFF requests: 309, 172, 159, 170, 157 ms; median 170 ms |
 | Field Core Web Vitals / Lighthouse certification | NOT TESTED | No field dataset or DevTools audit; request timings are not LCP/INP/CLS or an SLA |
 | Safety review / primary staging merge | PASS | Human reviewed and approved after Sourcery requested review; exact-head five-job CI passed; PR #13 merged to staging only |
 | 11G-D: primary staging rollout and probes | PASS | All five Railway services SUCCESS, no pending work; Web/API readiness 200, DB/Redis up, protected routes unchanged; deployment IDs below |
-| Reconnect recovery follow-up | PASS (regression) | Real provider event harness verifies missed-change invalidation and notification replacement; live follow-up rollout pending |
+| Reconnect recovery follow-up | PASS | Four provider-handler regressions; deployed browser dropped one event, reconnected and recovered LOW automatically; cleanup confirmed CLOSED/NORMAL |
+| Final runtime staging rollout | PASS | PR #14 merge `a4125c4`, all five Railway services SUCCESS/no pending work; fresh consumer/queue signals and eight public probes passed |
 | Production backup and restore certification | NOT TESTED | Paid backups declined; no restore drill; production release remains blocked |
 
 ## 11G-A: cause, fix and boundaries
@@ -151,21 +154,26 @@ was visible (171-pixel width), Enter moved focus to `workspace-content`, and
 there were no nested navigation landmarks. Desktop/mobile screenshots in
 `docs/images/phase-11g-*.png` were captured after actual tickets and realtime were
 ready. Account identity, all visible emails and assignee names were masked at
-capture; customer data is synthetic. All 35 original local documentation targets
-checked existed; the expanded report/images are checked again before delivery.
+capture; customer data is synthetic. All 37 local documentation targets in the
+runtime release existed; the final report's expanded links are checked before
+documentation delivery. These checks validate file targets, not all external
+URLs or every Markdown anchor.
 
 A long-running background session exposed stale data after disconnect/reconnect
 and accumulated recovery notifications. Transport/browser throttling can cause
 disconnects; this release does not claim to eliminate network interruptions.
-The follow-up refreshes active queries **after successful organization-room
-rejoin acknowledgment**, marks inactive caches stale for later use, and gives
+The follow-up refreshes active realtime-backed queries for the rejoined workspace
+**after successful organization-room acknowledgment**, marks their inactive caches stale, and gives
 the recovery toast a stable ID. Ticket-message queries are reconciled again after
 the ticket-room ACK because delivery updates use ticket rooms. Subscribing before
 refetching closes the gap where a write could commit after a snapshot read but
 before room subscription. Initial readiness/join does not redundantly refresh.
-Four tests execute the actual TypeScript provider's socket handlers, covering
+Six tests execute the actual TypeScript provider's socket handlers, covering
 missed/gap writes, ticket-delivery reconciliation, notification replacement and a
-denied rejoin that triggers no reconciliation. No authentication, role or
+denied organization rejoin that triggers no reconciliation. Additional coverage
+excludes other workspaces and unrelated customer/team queries, and confirms
+a denied ticket join adds no message recovery fetch after the permitted
+organization metadata refresh. No authentication, role or
 room-membership checks change.
 
 A controlled live baseline test used only the CLOSED disposable ticket. The
@@ -174,8 +182,12 @@ its own WebSocket; HTTP and authentication remained intact. A guarded priority
 PATCH returned 200/LOW (request `74cff75f-24c7-4ab8-b5c4-e9083875422a`), while
 the UI remained NORMAL even after reconnect. This reproduced the missing-refresh
 bug beyond the background-tab observation. The test restored priority NORMAL
-through the BFF and reloaded the inbox. The same check is repeated after the
-follow-up deploy. No credentials or socket authentication frames were extracted.
+through the BFF and reloaded the inbox. After PR #14 deployed, the same test
+dropped exactly one event: before reconnect NORMAL, after reconnect LOW,
+`recoveredLow=true`. The guarded PATCH returned 200 (request
+`522dc761-97dd-47ac-b823-dbfd5cc0ee2c`). A subsequent supported BFF read at
+15:31 UTC returned 200 and confirmed fixture identity, CLOSED status and restored
+NORMAL priority. No credentials or socket authentication frames were extracted.
 
 Latency samples used the existing authenticated Chrome session, sequential BFF
 ticket-list requests with `cache: no-store`, no artificial throttling, and measured
@@ -195,6 +207,12 @@ Local checks used Node 24.14.0 and pnpm 10.15.1; supported hosted CI uses Node 2
 Frozen installation and inert-environment Prisma generation passed. No provider
 secrets were needed for builds, documentation or unit tests.
 
+The scope-hardening build first ran in a fresh shell without `AUTH0_AUDIENCE`
+and failed configuration collection as designed. It passed after applying the
+inert public CI values; absent private Auth0 options produced SDK warnings rather
+than a claim of working local sign-in. Hosted CI supplies the full inert fixture
+configuration. No live credential was copied into the local preview.
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm --filter api exec prisma generate --config prisma7.config.ts
@@ -210,7 +228,7 @@ pnpm --filter web build
 ```
 
 Security E2E passed separately. A broader local attempt lacked Redis and is
-recorded above as an environment failure, not silently omitted. Full CI must run
+recorded above as an environment failure, not silently omitted. Full CI ran
 with Redis, three disposable PostgreSQL suites and all Docker targets. Docker
 Desktop was installed but its daemon was unavailable; no live database was used
 as a substitute. Existing lint warnings concern an unused type/control-character
@@ -242,7 +260,7 @@ the staging merge after that assessment. CI was not treated as human approval.
 Merged staging commit: **`1439b5c45ace86b8eb384687f4713da51e3d0d56`**.
 All three application deployments report that commit and branch
 `feat/phase-11-deployment`. This records the primary release snapshot; the focused
-reconnect follow-up is separately reviewed and checked before staging promotion.
+reconnect follow-up has its own review, CI and deployment evidence below.
 
 | Service | Successful deployment ID |
 | --- | --- |
@@ -256,3 +274,40 @@ At 15:04:28 and 15:04:58 UTC the new API emitted email queue health with waiting
 up with zero failures. Worker heartbeat at 15:05:14 UTC reported both consumers
 healthy. Web health, API live/ready, unauthenticated 401 and documentation 404
 probes all passed after rollout. No pending Railway work remained.
+
+## Final runtime deployment snapshot
+
+[PR #14](https://github.com/It-shahin/opsdesk/pull/14) merged to staging as
+**`a4125c4ae4d21c5db4b56fbc9228070415ed7171`**. Its final code head
+`8bb9078cf9a183d2f3119dc0f0062146b7dfdffe` passed all five jobs in
+[CI 38062892907](https://github.com/It-shahin/opsdesk/actions/runs/38062892907),
+and Sourcery's updated check succeeded. Both review findings were resolved:
+the valid reconnect timing gap was fixed by room-ACK ordering and regression
+coverage; GitHub blob metadata confirmed both allegedly missing images existed.
+The automatic merge [push CI 38063542294](https://github.com/It-shahin/opsdesk/actions/runs/38063542294)
+also passed before Railway's configured check-suite gate released the builds.
+
+| Service | Successful deployment ID |
+| --- | --- |
+| Web | `096dd626-4fbd-440e-9c7e-305c5f0cea0c` |
+| API | `5823b2bd-117f-48d4-81a0-490f8fad1306` |
+| Worker | `2a1d65c8-8e51-4ba2-959f-9adab8d082bd` |
+
+All three report the full merge SHA and staging branch. Postgres and Redis remain
+SUCCESS. At 15:30 UTC no pending work remained. At 15:30:28 and 15:30:58 UTC,
+email counts were waiting 0, active 0, delayed 1, failed 4, workersAlive 1,
+`consumerStatus=up`, `retainedFailureTrend=unchanged`, overall `status=degraded`.
+Maintenance was up with zero failures; fresh worker heartbeats reported both
+consumers healthy. After rollout all eight public probes passed: web health and
+API live/ready 200, unauthenticated ticket access 401, and `/docs`, `/api-docs`,
+`/swagger`, `/openapi.json` 404. The authenticated missed-event recovery test
+passed and restored its fixture, as recorded above.
+
+[PR #15](https://github.com/It-shahin/opsdesk/pull/15) also narrows organization
+recovery to realtime-backed ticket lists/details, customer ticket histories and
+analytics in the acknowledged workspace. Message recovery remains after the
+ticket-room ACK; unrelated customer/team data and other workspaces are excluded.
+The six regressions (50 web security/recovery tests total) pass locally. The
+snapshot above records PR #14; PR #15's own CI, merge and postdeployment evidence
+are recorded in its release history before final delivery. These are dated
+observations, not continuous monitoring.

@@ -19,7 +19,7 @@ function mountProvider() {
   const queryClient = {
     invalidateQueries: (filters) => {
       filtersSeen.push(filters);
-      if (filters === undefined) {
+      if (filters.predicate?.({ queryKey: ['ticket', 'demo-org', 'demo-ticket'] })) {
         refreshes++;
         cache.status = serverStatus;
       }
@@ -146,4 +146,40 @@ test('a denied organization rejoin does not reconcile unauthorized data', async 
   app.acknowledge('organization.join', { ok: false, error: { message: 'Not found' } });
   await assert.rejects(join, /Not found/);
   assert.equal(app.refreshes(), 0);
+});
+
+test('organization recovery refreshes only realtime data in the acknowledged workspace', async () => {
+  const app = mountProvider();
+  app.emit('realtime.ready');
+  app.emit('disconnect');
+  app.emit('realtime.ready');
+  const join = app.joinOrganization();
+  app.acknowledge('organization.join');
+  await join;
+  const { predicate } = app.filtersSeen[0];
+  for (const name of ['tickets', 'ticket', 'customer-tickets', 'analytics']) {
+    assert.equal(predicate({ queryKey: [name, 'demo-org', 'resource'] }), true);
+    assert.equal(predicate({ queryKey: [name, 'other-org', 'resource'] }), false);
+  }
+  for (const name of ['customers', 'members', 'invitations', 'ticket-members', 'ticket-tags', 'ticket-messages']) {
+    assert.equal(predicate({ queryKey: [name, 'demo-org', 'resource'] }), false);
+  }
+  assert.equal(predicate({ queryKey: ['organizations'] }), false);
+});
+
+test('denied ticket recovery does not refresh messages after the permitted organization snapshot', async () => {
+  const app = mountProvider();
+  app.emit('realtime.ready');
+  app.emit('disconnect');
+  app.emit('realtime.ready');
+  const organization = app.joinOrganization();
+  app.acknowledge('organization.join');
+  await organization;
+  assert.equal(app.refreshes(), 1);
+  const ticket = app.joinTicket();
+  await Promise.resolve();
+  app.acknowledge('ticket.join', { ok: false, error: { message: 'Not found' } });
+  await assert.rejects(ticket, /Not found/);
+  assert.equal(app.filtersSeen.length, 1);
+  assert.equal(app.filtersSeen[0].predicate({ queryKey: ['ticket-messages', 'demo-org', 'demo-ticket'] }), false);
 });

@@ -288,7 +288,12 @@ export function RealtimeProvider({
                 if (hasRecovered.current) {
                   // Subscribe before refetching so writes in the recovery gap
                   // are covered by either the snapshot or a subsequent event.
-                  void queryClient.invalidateQueries();
+                  void queryClient.invalidateQueries({
+                    predicate: ({ queryKey }) =>
+                      queryKey[1] === organizationId &&
+                      ['tickets', 'ticket', 'customer-tickets', 'analytics']
+                        .includes(String(queryKey[0])),
+                  });
                 }
               },
             )
