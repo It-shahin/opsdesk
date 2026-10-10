@@ -670,8 +670,12 @@ export function RealtimeProvider({
           if (
             hasConnected.current
           ) {
+            // Events may have been missed while disconnected. Refetch active
+            // queries; inactive workspace caches become stale for next use.
+            void queryClient.invalidateQueries();
             toast.success(
               'Realtime connection restored',
+              { id: 'realtime-restored' },
             );
           }
 

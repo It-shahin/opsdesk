@@ -11,6 +11,8 @@ Date: 2026-10-10. Target: `feat/phase-11-deployment` only.
 - Fixed the self-referencing font variable that caused a serif fallback.
 - Added a workspace skip link, a focusable main and accessible loading status;
   removed a redundant nested navigation landmark.
+- Reconnect follow-up refreshes data that may have changed while offline and
+  replaces repeated recovery notifications with one stable notification ID.
 - Added live integration evidence, a production checklist and updated operational
   guidance. No database migration or provider configuration change.
 

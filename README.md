@@ -4,9 +4,9 @@ Multi-tenant support software for managing customers, ticket conversations, team
 
 [Staging app](https://opsdesk-web-staging.up.railway.app/app) · [Architecture](docs/architecture.md) · [Security](docs/security.md) · [API & OpenAPI](docs/api/README.md) · [Deployment](docs/deployment.md)
 
-The staging app requires an authorized Auth0 account and workspace membership. Access details are shared privately. The screenshot below is from the actual seeded **Northstar Support [DEMO]** workspace; customer records are synthetic.
+The staging app requires an authorized Auth0 account and workspace membership. Access details are shared privately. The screenshot below is from the actual **Northstar Support [DEMO]** workspace after Phase 11G; customer records are synthetic. Account, email and assignee identities were masked during capture. [Mobile screenshot](docs/images/phase-11g-mobile.png).
 
-![Actual OpsDesk staging inbox with synthetic demo tickets](docs/images/demo-inbox.jpg)
+![Actual OpsDesk staging inbox with synthetic demo tickets and closed release fixture](docs/images/phase-11g-desktop.png)
 
 ## Features
 
