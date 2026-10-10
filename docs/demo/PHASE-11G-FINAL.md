@@ -17,7 +17,7 @@ Status: **staging portfolio complete; not production-ready**.
 | 11G-C desktop/mobile and accessibility basics | PASS | Live 1440/390-pixel layouts, loading/error/empty states, Geist font and actual keyboard skip-link checks |
 | Missed-event reconnect recovery | PASS | Exactly one missed event; UI NORMAL before reconnect → LOW after reconnect, then guarded cleanup to CLOSED/NORMAL |
 | Repeatable performance measurements | PASS (limited) | Five BFF requests median 170 ms; three warm authenticated reloads to content median 554 ms; no performance certification |
-| 11G-D CI / builds / documentation | PASS | API unit 445, hosted E2E 199, database integration 40, web auth 11, security/recovery 48; lint, OpenAPI and hosted Docker gates passed |
+| 11G-D CI / builds / documentation | PASS | API unit 445, hosted E2E 199, database integration 40, web auth 11; web security/recovery 48 on PR #14, 50 locally after scope hardening; lint, OpenAPI and hosted Docker gates passed |
 | Local full Redis E2E | FAIL (environment) | Local Redis unavailable: 177 passed, 20 failed, 41 skipped; full hosted Redis E2E passed |
 | Local PostgreSQL / Docker | NOT TESTED | Local daemon unavailable; separate hosted DB and Docker jobs passed |
 | Field vitals, capacity, all delivery failure modes | NOT TESTED | No field dataset/load test or controlled live bounce/complaint exercise |
@@ -55,9 +55,12 @@ and four Swagger/OpenAPI paths 404. Email queue at 15:30:58 UTC had waiting 0,
 active 0, delayed 1, failed 4, one fresh consumer, unchanged retained failures and
 the preserved degraded warning. Both worker consumers were healthy.
 
-The documentation delivery records this tested runtime snapshot; later commits
-containing only documentation do not represent a new feature or a claim of
-continuous monitoring. Repository PR/check history records their final delivery.
+[PR #15](https://github.com/It-shahin/opsdesk/pull/15) records final documentation
+and scope hardening: reconnect recovery excludes other workspaces and unrelated
+customer/team queries. Six handler regressions (50 security/recovery tests) pass
+locally. The snapshot above is the tested PR #14 runtime; PR #15's exact-head CI,
+merge and repeated deployed recovery check are recorded in its release history
+before final delivery. No continuous monitoring claim is made.
 
 ## What changed and why
 
@@ -75,9 +78,14 @@ healthy consumers from historical failures. This is an in-memory net count
 trend, not an error rate.
 
 Realtime recovery subscribes to authorized rooms before refetching snapshots,
-covering missed events and writes during rejoin. Initial connection avoids extra
-fetches; reconnects incur bounded reads and replace one notification. The change
-restores consistency after interruptions without promising uninterrupted sockets.
+covering missed events and writes during rejoin. Organization recovery refreshes
+only its realtime-backed ticket lists/details, customer ticket histories and
+analytics; message recovery requires a successful ticket-room acknowledgment.
+A denied organization join triggers no refresh. A denied ticket join adds no
+message refresh, although the permitted organization snapshot may already have
+refreshed ticket metadata. Initial connection avoids extra fetches; reconnects
+replace one notification. The change restores consistency after interruptions
+without promising uninterrupted sockets.
 
 ## Data and production boundary
 

@@ -25,7 +25,7 @@ success. A local environment failure is separate from hosted CI verification.
 | R2 lifecycle | PASS | Init 200, signed PUT 200, complete 200, note link 201, authorized signed GET 200, exact 70-byte content match |
 | API unit regression | PASS | 44 suites / 445 tests locally, including safe diagnostics and retained count trends |
 | Security E2E | PASS | 26 tests locally; synthetic auth/RBAC/tenancy/CSRF/rate-limit coverage |
-| Web auth / security | PASS | 11 auth and 48 security/recovery tests locally (44 on primary release plus 4 follow-up recovery regressions) |
+| Web auth / security | PASS | 11 auth and 50 security/recovery tests locally (44 baseline plus 6 recovery/scope regressions); the PR #14 runtime snapshot used 48 |
 | API/web lint and builds | PASS | Both pass; 2 existing lint warnings per app; no new errors |
 | Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
 | Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
@@ -162,15 +162,18 @@ URLs or every Markdown anchor.
 A long-running background session exposed stale data after disconnect/reconnect
 and accumulated recovery notifications. Transport/browser throttling can cause
 disconnects; this release does not claim to eliminate network interruptions.
-The follow-up refreshes active queries **after successful organization-room
-rejoin acknowledgment**, marks inactive caches stale for later use, and gives
+The follow-up refreshes active realtime-backed queries for the rejoined workspace
+**after successful organization-room acknowledgment**, marks their inactive caches stale, and gives
 the recovery toast a stable ID. Ticket-message queries are reconciled again after
 the ticket-room ACK because delivery updates use ticket rooms. Subscribing before
 refetching closes the gap where a write could commit after a snapshot read but
 before room subscription. Initial readiness/join does not redundantly refresh.
-Four tests execute the actual TypeScript provider's socket handlers, covering
+Six tests execute the actual TypeScript provider's socket handlers, covering
 missed/gap writes, ticket-delivery reconciliation, notification replacement and a
-denied rejoin that triggers no reconciliation. No authentication, role or
+denied organization rejoin that triggers no reconciliation. Additional coverage
+excludes other workspaces and unrelated customer/team queries, and confirms
+a denied ticket join adds no message recovery fetch after the permitted
+organization metadata refresh. No authentication, role or
 room-membership checks change.
 
 A controlled live baseline test used only the CLOSED disposable ticket. The
@@ -203,6 +206,12 @@ or an improvement claim. Local production landing checks had no overflow at
 Local checks used Node 24.14.0 and pnpm 10.15.1; supported hosted CI uses Node 22.
 Frozen installation and inert-environment Prisma generation passed. No provider
 secrets were needed for builds, documentation or unit tests.
+
+The scope-hardening build first ran in a fresh shell without `AUTH0_AUDIENCE`
+and failed configuration collection as designed. It passed after applying the
+inert public CI values; absent private Auth0 options produced SDK warnings rather
+than a claim of working local sign-in. Hosted CI supplies the full inert fixture
+configuration. No live credential was copied into the local preview.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -294,6 +303,11 @@ API live/ready 200, unauthenticated ticket access 401, and `/docs`, `/api-docs`,
 `/swagger`, `/openapi.json` 404. The authenticated missed-event recovery test
 passed and restored its fixture, as recorded above.
 
-The final report branch changes documentation only. These runtime observations
-are a dated snapshot of the tested code; its documentation delivery PR and CI
-provide the later repository history without claiming continuous monitoring.
+[PR #15](https://github.com/It-shahin/opsdesk/pull/15) also narrows organization
+recovery to realtime-backed ticket lists/details, customer ticket histories and
+analytics in the acknowledged workspace. Message recovery remains after the
+ticket-room ACK; unrelated customer/team data and other workspaces are excluded.
+The six regressions (50 web security/recovery tests total) pass locally. The
+snapshot above records PR #14; PR #15's own CI, merge and postdeployment evidence
+are recorded in its release history before final delivery. These are dated
+observations, not continuous monitoring.
