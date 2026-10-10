@@ -31,11 +31,11 @@ Web build-time values include `NEXT_PUBLIC_REALTIME_URL`, `NEXT_PUBLIC_R2_ORIGIN
 4. Deploy compatible API/worker/web versions, then inspect readiness, consumer heartbeats, queue health, and deployment logs.
 5. Verify authenticated workflows using approved accounts. Keep reports clear about live checks versus automated tests.
 
-The documentation branch changes API metadata and runtime dependencies, CI, and repository docs. It does not add DB migrations, alter guards, or enable hosted documentation. It still needs review because a merge rebuilds application images. No merge, deployment, paid service, backup upgrade, or production change is authorized by preparing the PR alone.
+Every release must be authorized for its target environment. Phase 11G is authorized for staging after exact-commit CI and diff review. It adds safe provider diagnostics, queue history/consumer signals, focused accessibility/font fixes, and release documentation. It adds no DB migrations, guard changes, hosted documentation, provider configuration changes, or paid resources. Production/default-branch release still requires separate consent.
 
 ## Operations and data safeguards
 
-Use [the operations runbook](operations/runbook.md) for readiness/queue interpretation, rollback, and provider failures. A ready API does not prove a healthy worker or successful delivery. During Phase 11E all services were online, but four retained failed email jobs caused a degraded queue signal; no retries, deletions, or emails were triggered by verification.
+Use [the operations runbook](operations/runbook.md) for readiness/queue interpretation, rollback, and provider failures. A ready API does not prove a healthy worker or successful delivery. Phase 11G traced the four retained failures to development sender recipient restrictions, preserved them, and verified one approved sandbox email round trip. See the [release report](PHASE-11G-REPORT.md) for evidence and limitations.
 
 The [demo tooling](demo/README.md) has explicit staging identity/database safeguards. Validation was read-only and confirmed 8 customers / 12 tickets / 5 tags / 48 messages. Seed/reset commands are writes and are not part of routine health verification. Never replace identity/database safeguards with production values or disable them to make a command pass.
 

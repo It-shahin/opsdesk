@@ -1,0 +1,170 @@
+# Phase 11G staging release verification
+
+Verification date: **2026-10-10 UTC**. Source baseline:
+`aa2259b5dd029735d5378f9cd880bd07b76bf2db` (merged Phase 11F PR #11).
+Release branch: `feat/phase-11-release`; target: `feat/phase-11-deployment`.
+Scope is staging portfolio release, **not production certification**.
+
+## Release matrix
+
+PASS means observed evidence for the stated scope. NOT TESTED means no claim of
+success. A local environment failure is separate from hosted CI verification.
+
+| Check | Result | Evidence / scope |
+| --- | --- | --- |
+| 11G-A: retained email failure diagnosis | PASS | Four retained jobs, one attempt each, permanent provider rejection; correlated provider logs confirm sandbox recipient restriction |
+| Current approved sandbox outbound | PASS | One synthetic public reply, worker completion, provider sent/delivered events, application DELIVERED state |
+| Actual inbound routing and realtime | PASS | User replied from approved mailbox; received webhook success and CUSTOMER public message on same ticket; open owner conversation updated without reload |
+| Historical failure preservation | PASS | No retry/replay/delete; initial waiting 0, active 0, delayed 1, failed 4, workers 1 |
+| Arbitrary recipients / verified custom sending domain | NOT TESTED | Connected provider has no verified sending domains; development sender limitation remains |
+| 11G-B: real authenticated nonmember 404 | PASS | Supported BFF GET to demo tickets returned 404; matching API request log at 11:31:45 UTC |
+| Synthetic status, assignment, internal notes | PASS | PATCH status/assignee 200; internal note 201; assignment reflected in owner UI |
+| Actual cross-session realtime | PASS | Owner inbox gained new ticket without reload; open conversation received notes, attachment and inbound reply |
+| R2 lifecycle | PASS | Init 200, signed PUT 200, complete 200, note link 201, authorized signed GET 200, exact 70-byte content match |
+| API unit regression | PASS | 44 suites / 445 tests locally, including safe diagnostics and retained count trends |
+| Security E2E | PASS | 26 tests locally; synthetic auth/RBAC/tenancy/CSRF/rate-limit coverage |
+| Web auth / security | PASS | 11 auth and 44 security tests locally |
+| API/web lint and builds | PASS | Both pass; 2 existing lint warnings per app; no new errors |
+| Offline OpenAPI / viewer guards | PASS | 38 HTTP operations; 3 viewer safeguard tests; drift check passes |
+| Full local Redis E2E attempt | FAIL (environment) | No local Redis daemon: realtime connection tests failed; 177 passed, 20 failed, 41 skipped in partial run |
+| Local PostgreSQL integration / Docker images | NOT TESTED | Docker engine unavailable; no disposable local DB/Redis. Hosted CI required |
+| Hosted CI and Docker gates | NOT TESTED | Pending release PR checks; merge prohibited until passing |
+| 11G-C: desktop/mobile usability | PASS | Live desktop 1440×900 and mobile 390×844 navigation, filters and layout inspected; no mobile horizontal overflow |
+| Empty state / loading semantics | PASS | Empty workspace observed; accessible loading status added and build verified |
+| Controlled error-state browser check | NOT TESTED | Pending controlled response failure and retry verification |
+| Font regression fix | PASS | Live baseline computed Times New Roman due self-referencing font variable; local production build computes Geist/Arial fallback |
+| Keyboard access source/build | PASS | Skip link, focusable main and unnested nav added |
+| Live postdeployment keyboard check | NOT TESTED | Pending authenticated staging rollout |
+| Repeatable latency sample | PASS (limited) | Five sequential authenticated no-store BFF requests: 309, 172, 159, 170, 157 ms; median 170 ms |
+| Field Core Web Vitals / Lighthouse certification | NOT TESTED | No field dataset or DevTools audit; request timings are not LCP/INP/CLS or an SLA |
+| 11G-D: staging rollout and postrelease probes | NOT TESTED | Pending exact-commit CI, review, merge and Railway observation |
+| Production backup and restore certification | NOT TESTED | Paid backups declined; no restore drill; production release remains blocked |
+
+## 11G-A: cause, fix and boundaries
+
+Read-only queue/database inspection at **11:23:01 UTC** found four failed BullMQ
+email jobs, all completed on 2026-10-09 at 16:13:28, 16:17:32, 19:52:06 and
+22:54:47 UTC. Each had one attempt, a FAILED delivery record and no accepted
+provider message. The live queue had no waiting/active work and one fresh worker.
+The delayed job and maintenance schedule were not evidence of a stalled email.
+
+Private provider logs at those matching times were POST `/emails`, HTTP **403**,
+code `validation_error`, explicitly describing the development sender's
+account-only test recipient restriction. This was not an inferred DNS failure,
+missing credential, API-key permission issue or verified-domain outage. Sender
+configuration uses the provider's development domain; the connected provider
+lists no custom sending domains. No configuration or DNS changes were needed for
+the approved sandbox recipient. [Resend error reference](https://resend.com/docs/api-reference/errors)
+and [test-email constraints](https://resend.com/docs/dashboard/emails/send-test-emails).
+
+The old logs lost the useful provider code when a permanent rejection was wrapped
+as a BullMQ unrecoverable error. New `email.provider.failed` events preserve only
+allowlisted codes, a bounded status and retry/final-attempt flags. Raw responses
+can contain private addresses; tests verify they never enter this event. The
+worker's retry classification, idempotency and delivery-state behavior are unchanged.
+
+Queue events now expose consumer health and retained failure count/trend while
+keeping the existing degraded warning. A stable failed count is historical
+evidence, not proof that future sends will succeed; net counts are not rates.
+No retained jobs were deleted, retried or replaced to clear monitoring warnings.
+
+## 11G-B: live integration evidence
+
+Only existing legitimately signed-in Auth0 accounts were used. No identities,
+tokens, passwords or sessions were extracted. The second account was a nonmember
+when the 404 test ran. The user subsequently gave that account an Agent membership;
+later successful tests therefore do not contradict the earlier nonmember result.
+No membership or role was changed by this release workflow.
+
+The nonmember BFF request ID was
+`2e0b3e80-b411-4991-911c-213d205ffcbc`. Railway correlated
+`GET /v1/organizations/:organizationId/tickets`, 404, 192 ms. Response cache policy
+was no-store. This checks the supported browser/BFF/API path rather than a forged
+identity or a UI-only denial.
+
+One separately named **Phase 11G Release Test 2026-10-10** customer and
+**Phase 11G synthetic integration 2026-10-10** ticket were created in Northstar's
+demo organization. The approved sandbox recipient is private and omitted here.
+Existing demo/genuine customer records were not overwritten. Original seed counts
+in the Phase 11E report remain historical; new fixtures naturally add rows.
+
+| Operation | Redacted correlation evidence |
+| --- | --- |
+| Synthetic ticket create, 201 | `eb0132d0-63eb-4aad-8ae8-419d21b634b8` |
+| Status PENDING, 200 | `b0aaa3ac-3e97-4a0e-86d7-0261dc39d9e7` |
+| Agent assignment, 200 | `ff542225-4a3a-4aae-83b2-1ea8495fd26a` |
+| Internal note, 201 | `2dd11acc-3fe7-423b-892a-5d1df400ec1e` |
+| R2 initialize / complete, 200 | `0e4d8869-babb-43d7-a2cb-edf5fcb8ae8b` / `da9db5d4-6c08-4296-ac5d-fef674186580` |
+| Attachment note / download authorization | `2cc23c9a-4f98-4dc3-84bd-b63787521660` / `c49401f5-aba9-47b2-8db1-cef1fbd89856` |
+
+The attachment was 70 bytes of synthetic plain text. Browser PUT/GET returned 200
+and downloaded content exactly matched. Signed URLs were kept in browser memory,
+never stored in this report. An open owner conversation gained the Agent's notes
+and attachment without reload; the owner's inbox also gained the newly created
+ticket. This is observed propagation across two real sessions, beyond a socket's
+connected indicator.
+
+One public reply was sent through the normal owner composer. Worker completion
+was logged at **11:38:54 UTC**, provider sent at **11:38:56.352 UTC**, and provider
+delivered at **11:38:59.060 UTC**. The BFF showed DELIVERED. The user replied from
+the approved mailbox; `email.received` webhook succeeded at **11:40:33.064 UTC**,
+creating a CUSTOMER public reply on the same ticket and reopening it to OPEN.
+The user used their own short test sentence rather than the suggested exact marker;
+the evidence is the correlated arrival, routed message and live UI update.
+
+This proves one sandbox round trip. It does not certify arbitrary recipients,
+bounce/complaint handling against real mailboxes, attachment delivery in outbound
+email, or every provider failure mode. Those modes remain covered by automated
+tests where present and need separately scoped live tests where required.
+
+## 11G-C: focused UI and performance changes
+
+The font custom property referenced itself, invalidating the intended sans font
+and producing Times New Roman in staging. It now references the loaded Geist
+variable with explicit fallbacks. A keyboard skip link targets a focusable main,
+the redundant outer navigation landmark is removed, and workspace loading has a
+status role/name. These are focused fixes; the interface and security flows were
+not redesigned.
+
+Live checks inspected desktop and mobile navigation, filter wrapping, menu links,
+conversation/attachment layout and the empty workspace state. Mobile document
+width was 375 at a 390-pixel viewport (scrollbar accounted for), without overflow.
+The local production preview confirmed the corrected font. Authentication stays
+with the supported Auth0 flow; local checks used inert provider placeholders.
+
+Latency samples used the existing authenticated Chrome session, sequential BFF
+ticket-list requests with `cache: no-store`, no artificial throttling, and measured
+fetch plus body consumption. Five samples and a median describe that moment only;
+no before/after speedup, field vitals or performance certification is claimed.
+
+## 11G-D: reproducible release gates
+
+Local checks used Node 24.14.0 and pnpm 10.15.1; supported hosted CI uses Node 22.
+Frozen installation and inert-environment Prisma generation passed. No provider
+secrets were needed for builds, documentation or unit tests.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter api exec prisma generate --config prisma7.config.ts
+pnpm --filter api lint
+pnpm --filter api build
+pnpm --filter api test
+pnpm --filter api test:openapi
+pnpm --filter api openapi:check
+pnpm --filter web lint
+pnpm --filter web test:auth
+pnpm --filter web test:security
+pnpm --filter web build
+```
+
+Security E2E passed separately. A broader local attempt lacked Redis and is
+recorded above as an environment failure, not silently omitted. Full CI must run
+with Redis, three disposable PostgreSQL suites and all Docker targets. Docker
+Desktop was installed but its daemon was unavailable; no live database was used
+as a substitute. Existing lint warnings concern an unused type/control-character
+regex in API and realtime-effect cleanup references in web.
+
+Only the new feature branch and staging target are in scope. No production merge,
+security bypass, schema migration, paid resource, failed-job cleanup or credential
+publication is authorized here. Release notes, checklist and runbook are updated.
+Exact PR/CI/merge/deployment evidence will be added when those gates complete.
