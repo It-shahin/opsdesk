@@ -41,29 +41,4 @@ The hosted CI runs application unit tests, security and Redis E2E tests, Postgre
 
 **Limitations disclosed:** The staging environment requires authorized sign-in; the Resend development sender permits only approved test recipients (four historical rejected jobs remain retained); no production backup/restore drill, field performance certification, attachment malware scanning or unrestricted commercial email delivery is claimed. See [production-readiness criteria](PRODUCTION-READINESS.md).
 
-## Portfolio descriptions ready to reuse
 
-### CV — short
-
-**OpsDesk — Full-Stack SaaS Portfolio Project**  
-Built a multi-tenant customer-support and CRM application using Next.js, NestJS, TypeScript, PostgreSQL/Prisma and Redis/BullMQ. Implemented Auth0/RBAC tenant isolation, realtime ticket updates, Resend email, Cloudflare R2 attachments, analytics and CI-tested Docker/Railway staging deployment.
-
-### LinkedIn / project section
-
-**OpsDesk | Multi-tenant Support & CRM SaaS**
-
-I built OpsDesk to explore the engineering challenges behind real support platforms—not just building pages, but coordinating tenant-safe APIs, asynchronous jobs, third-party integrations, and realtime user experiences.
-
-The app includes a customer CRM, ticket queues, agent assignments, internal notes, outbound/inbound email workflows, attachment uploads, and operational analytics. I used Next.js and NestJS in a TypeScript monorepo, with Auth0, Prisma/PostgreSQL, Redis/BullMQ, Socket.IO, Cloudflare R2 and Resend.
-
-I also added automated security and integration tests, GitHub Actions, Docker, Railway staging, OpenAPI documentation and an end-to-end release verification report.
-
-This is a portfolio staging application, not a commercial production deployment. The [repository](https://github.com/It-shahin/opsdesk) includes authentic sanitized screenshots, architecture, setup and testing instructions.
-
-### Interview explanation (30 seconds)
-
-“OpsDesk is a multi-tenant support platform I built with Next.js and NestJS. It combines CRM and ticket workflows with Auth0 role-based access, PostgreSQL and Prisma, BullMQ background email jobs, Cloudflare R2 attachments and Socket.IO realtime events. I focused heavily on protecting tenant boundaries, handling integrations safely, and verifying the whole system with CI and live staging tests. One interesting challenge was reconnect recovery: the UI now refreshes the correct workspace data after rejoining authorized realtime rooms.”
-
-## Suggested live demonstration
-
-Follow the [recording storyboard](DEMO-WALKTHROUGH.md). For privacy, use the synthetic demo workspace only and never show Auth0 credentials, token values, signed upload links, user emails or operational secrets. Recruiters should not be given shared production-like credentials.
