@@ -3,8 +3,7 @@
 **Project:** OpsDesk · Multi-tenant customer support and CRM SaaS prototype  
 **Stage:** Completed, verified staging portfolio application (not production-certified)  
 **Repository:** [github.com/It-shahin/opsdesk](https://github.com/It-shahin/opsdesk)  
-**App:** [Railway staging](https://opsdesk-web-staging.up.railway.app/app) (requires existing authorized Auth0 membership)  
-**Walkthrough:** [2–3 minute demo plan](DEMO-WALKTHROUGH.md)
+**App:** [Railway staging](https://opsdesk-web-staging.up.railway.app/app) (requires existing authorized Auth0 membership)
 
 ![Real staged OpsDesk inbox with sanitized synthetic ticket data](images/phase-11g-desktop.png)
 
