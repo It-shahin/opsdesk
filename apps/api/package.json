@@ -8,6 +8,10 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
+    "demo:seed": "node dist/demo/seed-demo.js",
+    "demo:validate": "node dist/demo/seed-demo.js --action validate",
+    "demo:reset": "node dist/demo/seed-demo.js --action reset",
+    "test:demo:db": "cross-env DEMO_DATABASE_TESTS=1 NODE_OPTIONS=--experimental-vm-modules jest --config ./jest.config.e2e.cjs --runInBand demo-database.e2e-spec.ts",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start --entryFile main.js",
