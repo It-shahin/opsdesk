@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -40,6 +41,7 @@ import {
   InitiateAttachmentUploadDto,
 } from './dto/initiate-attachment-upload.dto.js';
 
+@ApiResource('Attachments')
 @Controller(
   'v1/organizations/:organizationId/tickets/:ticketId/attachments',
 )
@@ -53,6 +55,7 @@ export class AttachmentsController {
       AttachmentsService,
   ) {}
 
+  @ApiResult('InitiatedAttachment')
   @Post('init')
   @HttpCode(200)
   @Throttle({
@@ -96,6 +99,7 @@ export class AttachmentsController {
       );
   }
 
+  @ApiResult('Attachment')
   @Post(
     ':attachmentId/complete',
   )
@@ -143,6 +147,7 @@ export class AttachmentsController {
       );
   }
 
+  @ApiResult('Download')
   @Get(':attachmentId/download')
   @RequirePermissions(
     PERMISSIONS.TICKETS_READ,

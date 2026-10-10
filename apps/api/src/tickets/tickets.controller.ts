@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -28,6 +29,7 @@ import { UpdateTicketAssigneeDto } from './dto/update-ticket-assignee.dto.js';
 import { CreateTicketMessageDto } from './dto/create-ticket-message.dto.js';
 import {ListTicketsDto} from './dto/list-tickets.dto.js';
 
+@ApiResource('Tickets')
 @Controller(
   'v1/organizations/:organizationId/tickets',
 )
@@ -41,7 +43,8 @@ export class TicketsController {
       TicketsService,
   ) {}
 
- @Get()
+ @ApiResult('Tickets')
+  @Get()
 @RequirePermissions(
   PERMISSIONS.TICKETS_READ,
 )
@@ -69,6 +72,7 @@ async list(
   );
 }
 
+  @ApiResult('Ticket')
   @Post()
   @RequirePermissions(
     PERMISSIONS.TICKETS_WRITE,
@@ -96,7 +100,8 @@ async list(
     );
   }
 
-    @Get(':ticketId')
+    @ApiResult('Ticket')
+  @Get(':ticketId')
     @RequirePermissions(
     PERMISSIONS.TICKETS_READ,
     )
@@ -126,7 +131,8 @@ async list(
     );
 }
 
-@Patch(':ticketId')
+@ApiResult('Ticket')
+  @Patch(':ticketId')
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
 )
@@ -160,7 +166,8 @@ async update(
   );
 }
 
-@Patch(':ticketId/status')
+@ApiResult('Ticket')
+  @Patch(':ticketId/status')
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
 )
@@ -196,7 +203,8 @@ async updateStatus(
     );
 }
 
-@Patch(':ticketId/assignee')
+@ApiResult('Ticket')
+  @Patch(':ticketId/assignee')
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
 )
@@ -231,7 +239,8 @@ async assign(
   );
 }
 
-@Post(':ticketId/tags/:tagId')
+@ApiResult('Ticket')
+  @Post(':ticketId/tags/:tagId')
 @HttpCode(200)
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
@@ -269,7 +278,8 @@ async addTag(
   );
 }
 
-@Delete(':ticketId/tags/:tagId')
+@ApiResult('Ticket')
+  @Delete(':ticketId/tags/:tagId')
 @RequirePermissions(
   PERMISSIONS.TICKETS_WRITE,
 )
@@ -306,7 +316,8 @@ async removeTag(
   );
 }
 
-@Get(':ticketId/messages')
+@ApiResult('Messages')
+  @Get(':ticketId/messages')
 @RequirePermissions(
   PERMISSIONS.TICKETS_READ,
 )
@@ -336,7 +347,8 @@ async listMessages(
   );
 }
 
-@Post(':ticketId/messages')
+@ApiResult('Message')
+  @Post(':ticketId/messages')
 @Throttle({
   default: {
     limit: 30,

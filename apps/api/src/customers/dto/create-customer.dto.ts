@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
@@ -14,54 +15,60 @@ function trimOptional(value: unknown) {
 
   const trimmed = value.trim();
 
-  return trimmed.length > 0
-    ? trimmed
-    : undefined;
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 export class CreateCustomerDto {
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim()
-      : value,
-  )
+  @ApiProperty({ type: String, required: true, minLength: 1, maxLength: 120 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   name!: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    format: 'email',
+    maxLength: 254,
+  })
   @Transform(({ value }) => {
-    const trimmed =
-      trimOptional(value);
+    const trimmed = trimOptional(value);
 
-    return typeof trimmed === 'string'
-      ? trimmed.toLowerCase()
-      : trimmed;
+    return typeof trimmed === 'string' ? trimmed.toLowerCase() : trimmed;
   })
   @IsOptional()
   @IsEmail()
   @MaxLength(254)
   email?: string;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({ type: String, required: false, nullable: true, maxLength: 40 })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(40)
   phone?: string;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 120,
+  })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(120)
   company?: string;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 2000,
+  })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(2000)

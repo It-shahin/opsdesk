@@ -31,7 +31,11 @@
     "contract:emit": "prisma contract emit",
     "dev:worker": "nest start --watch --entryFile worker.js",
     "start:worker": "node dist/worker.js",
-    "migrate:deploy": "prisma migrate deploy --config prisma7.config.ts"
+    "migrate:deploy": "prisma migrate deploy --config prisma7.config.ts",
+    "openapi:generate": "node scripts/openapi.mjs generate",
+    "openapi:check": "node scripts/openapi.mjs check",
+    "openapi:serve": "node scripts/openapi.mjs serve",
+    "test:openapi": "node --test scripts/openapi-policy.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1137.0",
@@ -41,6 +45,7 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/platform-socket.io": "^12.1.2",
+    "@nestjs/swagger": "12.0.2",
     "@nestjs/throttler": "^6.7.1",
     "@nestjs/websockets": "^12.1.2",
     "@prisma/adapter-pg": "7.10.0",
@@ -55,14 +60,15 @@
     "ioredis": "^6.0.0",
     "jose": "^6.2.12",
     "pg": "^8.23.0",
+    "prisma": "7.10.0",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.30.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.4",
-    "zod": "^4.6.1",
-    "prisma": "7.10.0"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
     "@jest/globals": "30.5.1",
     "@nestjs/cli": "^12.0.0",
     "@nestjs/mau": "^0.2.6",

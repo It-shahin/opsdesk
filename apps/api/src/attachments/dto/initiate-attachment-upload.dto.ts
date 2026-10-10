@@ -1,6 +1,5 @@
-import {
-  Transform,
-} from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 import {
   IsIn,
@@ -18,32 +17,32 @@ import {
 } from '../attachment-policy.js';
 
 export class InitiateAttachmentUploadDto {
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim()
-      : value,
-  )
+  @ApiProperty({ type: String, required: true, minLength: 1, maxLength: 255 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(255)
   originalName!: string;
 
+  @ApiProperty({
+    type: String,
+    required: true,
+    enum: [...ALLOWED_ATTACHMENT_CONTENT_TYPES],
+  })
   @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value
-          .trim()
-          .toLowerCase()
-      : value,
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsIn([
-    ...ALLOWED_ATTACHMENT_CONTENT_TYPES,
-  ])
+  @IsIn([...ALLOWED_ATTACHMENT_CONTENT_TYPES])
   contentType!: string;
 
+  @ApiProperty({
+    type: 'integer',
+    required: true,
+    minimum: 1,
+    maximum: MAX_ATTACHMENT_SIZE_BYTES,
+  })
   @IsInt()
   @Min(1)
-  @Max(
-    MAX_ATTACHMENT_SIZE_BYTES,
-  )
+  @Max(MAX_ATTACHMENT_SIZE_BYTES)
   sizeBytes!: number;
 }

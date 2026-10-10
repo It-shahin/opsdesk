@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsIn,
@@ -17,48 +18,47 @@ const TICKET_PRIORITIES = [
   'URGENT',
 ] as const satisfies readonly TicketPriority[];
 
-function trimOptional(
-  value: unknown,
-) {
-  if (
-    typeof value !== 'string'
-  ) {
+function trimOptional(value: unknown) {
+  if (typeof value !== 'string') {
     return value;
   }
 
-  const trimmed =
-    value.trim();
+  const trimmed = value.trim();
 
-  return trimmed.length
-    ? trimmed
-    : undefined;
+  return trimmed.length ? trimmed : undefined;
 }
 
 export class CreateTicketDto {
+  @ApiProperty({ type: String, required: true, format: 'uuid' })
   @IsUUID()
   customerId!: string;
 
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim()
-      : value,
-  )
+  @ApiProperty({ type: String, required: true, minLength: 1, maxLength: 200 })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(200)
   subject!: string;
 
-  @Transform(({ value }) =>
-    trimOptional(value),
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 5000,
+  })
+  @Transform(({ value }) => trimOptional(value))
   @IsOptional()
   @IsString()
   @MaxLength(5000)
   description?: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    enum: [...TICKET_PRIORITIES],
+  })
   @IsOptional()
-  @IsIn([
-    ...TICKET_PRIORITIES,
-  ])
+  @IsIn([...TICKET_PRIORITIES])
   priority?: TicketPriority;
 }

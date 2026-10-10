@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Controller,
   Get,
@@ -7,12 +8,14 @@ import {
 import type { AuthenticatedRequest } from '../auth/auth.types.js';
 import { UsersService } from './users.service.js';
 
+@ApiResource('Users')
 @Controller('v1')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
   ) {}
 
+  @ApiResult('User')
   @Get('me')
   async getCurrentUser(
     @Req() request: AuthenticatedRequest,

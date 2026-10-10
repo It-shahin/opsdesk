@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Controller,
   ForbiddenException,
@@ -21,11 +22,13 @@ import { AnalyticsService } from './analytics.service.js';
 
 import { AnalyticsOverviewQueryDto } from './dto/analytics-overview-query.dto.js';
 
+@ApiResource('Analytics')
 @Controller('v1/organizations/:organizationId/analytics')
 @UseGuards(TenantMembershipGuard, PermissionGuard)
 export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}
 
+  @ApiResult('Analytics')
   @Get('overview')
   @RequirePermissions(PERMISSIONS.ANALYTICS_READ)
   async overview(

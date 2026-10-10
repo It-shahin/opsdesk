@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -26,6 +27,7 @@ import {
   Query,
 } from '@nestjs/common';
 
+@ApiResource('Customers')
 @Controller(
   'v1/organizations/:organizationId/customers',
 )
@@ -39,6 +41,7 @@ export class CustomersController {
       CustomersService,
   ) {}
 
+  @ApiResult('Customers')
   @Get()
   @RequirePermissions(
     PERMISSIONS.CUSTOMERS_READ,
@@ -65,6 +68,7 @@ export class CustomersController {
     );
   }
 
+  @ApiResult('Customer')
   @Get(':customerId')
 @RequirePermissions(
   PERMISSIONS.CUSTOMERS_READ,
@@ -94,6 +98,7 @@ async getOne(
   );
 }
 
+  @ApiResult('Customer')
   @Post()
   @RequirePermissions(
     PERMISSIONS.CUSTOMERS_WRITE,
@@ -120,6 +125,7 @@ async getOne(
     );
   }
 
+  @ApiResult('Customer')
   @Patch(':customerId')
   @RequirePermissions(
     PERMISSIONS.CUSTOMERS_WRITE,
@@ -153,7 +159,8 @@ async getOne(
     );
 }
 
-@Post(':customerId/restore')
+@ApiResult('Customer')
+  @Post(':customerId/restore')
 @HttpCode(200)
 @RequirePermissions(
   PERMISSIONS.CUSTOMERS_WRITE,
@@ -183,7 +190,8 @@ async restore(
   );
 }
 
-@Post(':customerId/archive')
+@ApiResult('Customer')
+  @Post(':customerId/archive')
 @HttpCode(200)
 @RequirePermissions(
   PERMISSIONS.CUSTOMERS_WRITE,

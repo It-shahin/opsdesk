@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Controller,
   ForbiddenException,
@@ -35,6 +36,7 @@ import {
   ListAuditLogsDto,
 } from './dto/list-audit-logs.dto.js';
 
+@ApiResource('Audit')
 @Controller(
   'v1/organizations/:organizationId/audit-logs',
 )
@@ -48,6 +50,7 @@ export class AuditController {
       AuditService,
   ) {}
 
+  @ApiResult('AuditLogs')
   @Get()
   @RequirePermissions(
     PERMISSIONS.AUDIT_LOGS_READ,

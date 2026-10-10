@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -16,6 +17,7 @@ import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types
 import { CreateTagDto } from './dto/create-tag.dto.js';
 import { TagsService } from './tags.service.js';
 
+@ApiResource('Tags')
 @Controller(
   'v1/organizations/:organizationId/tags',
 )
@@ -29,6 +31,7 @@ export class TagsController {
       TagsService,
   ) {}
 
+  @ApiResult('Tags')
   @Get()
   @RequirePermissions(
     PERMISSIONS.TICKETS_READ,
@@ -52,6 +55,7 @@ export class TagsController {
     );
   }
 
+  @ApiResult('Tag')
   @Post()
   @RequirePermissions(
     PERMISSIONS.TICKETS_WRITE,
