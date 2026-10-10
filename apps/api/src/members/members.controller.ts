@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -18,6 +19,7 @@ import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto.js';
 import { MembersService } from './members.service.js';
 
+@ApiResource('Members')
 @Controller(
   'v1/organizations/:organizationId/members',
 )
@@ -31,6 +33,7 @@ export class MembersController {
       MembersService,
   ) {}
 
+  @ApiResult('Members')
   @Get()
   @RequirePermissions(
     PERMISSIONS.MEMBERS_READ,
@@ -53,6 +56,7 @@ export class MembersController {
       );
   }
 
+  @ApiResult('Member')
   @Patch(':membershipId/role')
   @RequirePermissions(
     PERMISSIONS.MEMBERS_MANAGE,

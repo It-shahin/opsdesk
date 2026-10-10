@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -21,6 +22,7 @@ import type { TenantAuthenticatedRequest } from '../tenancy/tenant-context.types
 import { CreateInvitationDto } from './dto/create-invitation.dto.js';
 import { InvitationsService } from './invitations.service.js';
 
+@ApiResource('Invitations')
 @Controller(
   'v1/organizations/:organizationId/invitations',
 )
@@ -37,6 +39,7 @@ export class InvitationsController {
       InvitationsService,
   ) {}
 
+  @ApiResult('CreatedInvitation')
   @Post()
   @Throttle({
     default: {
@@ -68,6 +71,7 @@ export class InvitationsController {
     );
   }
 
+  @ApiResult('Invitations')
   @Get()
   async list(
     @Req()
@@ -87,6 +91,7 @@ export class InvitationsController {
     );
   }
 
+  @ApiResult('Invitation')
   @Delete(':invitationId')
   @HttpCode(200)
   async cancel(

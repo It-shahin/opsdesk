@@ -1,6 +1,5 @@
-import {
-  Type,
-} from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 import {
   IsIn,
@@ -17,94 +16,118 @@ import type {
   AuditEntityType,
 } from '../../generated/prisma/enums.js';
 
-const AUDIT_ACTIONS =
-  [
-    'ORGANIZATION_CREATED',
+const AUDIT_ACTIONS = [
+  'ORGANIZATION_CREATED',
 
-    'CUSTOMER_CREATED',
-    'CUSTOMER_UPDATED',
-    'CUSTOMER_ARCHIVED',
-    'CUSTOMER_RESTORED',
+  'CUSTOMER_CREATED',
+  'CUSTOMER_UPDATED',
+  'CUSTOMER_ARCHIVED',
+  'CUSTOMER_RESTORED',
 
-    'TICKET_CREATED',
-    'TICKET_UPDATED',
-    'TICKET_STATUS_CHANGED',
-    'TICKET_ASSIGNEE_CHANGED',
-    'TICKET_TAG_ADDED',
-    'TICKET_TAG_REMOVED',
-    'TICKET_MESSAGE_CREATED',
+  'TICKET_CREATED',
+  'TICKET_UPDATED',
+  'TICKET_STATUS_CHANGED',
+  'TICKET_ASSIGNEE_CHANGED',
+  'TICKET_TAG_ADDED',
+  'TICKET_TAG_REMOVED',
+  'TICKET_MESSAGE_CREATED',
 
-    'TAG_CREATED',
+  'TAG_CREATED',
 
-    'MEMBER_ROLE_CHANGED',
+  'MEMBER_ROLE_CHANGED',
 
-    'INVITATION_CREATED',
-    'INVITATION_CANCELED',
-    'INVITATION_ACCEPTED',
-  ] as const satisfies readonly AuditAction[];
+  'INVITATION_CREATED',
+  'INVITATION_CANCELED',
+  'INVITATION_ACCEPTED',
+] as const satisfies readonly AuditAction[];
 
-const AUDIT_ENTITY_TYPES =
-  [
-    'ORGANIZATION',
-    'CUSTOMER',
-    'TICKET',
-    'TICKET_MESSAGE',
-    'TAG',
-    'MEMBERSHIP',
-    'INVITATION',
-  ] as const satisfies readonly AuditEntityType[];
+const AUDIT_ENTITY_TYPES = [
+  'ORGANIZATION',
+  'CUSTOMER',
+  'TICKET',
+  'TICKET_MESSAGE',
+  'TAG',
+  'MEMBERSHIP',
+  'INVITATION',
+] as const satisfies readonly AuditEntityType[];
 
 export class ListAuditLogsDto {
-  @Type(
-    () =>
-      Number,
-  )
+  @ApiProperty({ type: 'integer', required: false, minimum: 1, default: 1 })
+  @Type(() => Number)
   @IsInt()
   @Min(1)
-  page =
-    1;
+  page = 1;
 
-  @Type(
-    () =>
-      Number,
-  )
+  @ApiProperty({
+    type: 'integer',
+    required: false,
+    minimum: 1,
+    maximum: 100,
+    default: 25,
+  })
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
-  limit =
-    25;
+  limit = 25;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    enum: [...AUDIT_ACTIONS],
+  })
   @IsOptional()
-  @IsIn([
-    ...AUDIT_ACTIONS,
-  ])
-  action?:
-    AuditAction;
+  @IsIn([...AUDIT_ACTIONS])
+  action?: AuditAction;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    enum: [...AUDIT_ENTITY_TYPES],
+  })
   @IsOptional()
-  @IsIn([
-    ...AUDIT_ENTITY_TYPES,
-  ])
-  entityType?:
-    AuditEntityType;
+  @IsIn([...AUDIT_ENTITY_TYPES])
+  entityType?: AuditEntityType;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    format: 'uuid',
+  })
   @IsOptional()
   @IsUUID()
-  entityId?:
-    string;
+  entityId?: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    format: 'uuid',
+  })
   @IsOptional()
   @IsUUID()
-  actorUserId?:
-    string;
+  actorUserId?: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: 'ISO 8601 timestamp accepted by IsISO8601.',
+  })
   @IsOptional()
   @IsISO8601()
-  from?:
-    string;
+  from?: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: 'ISO 8601 timestamp accepted by IsISO8601.',
+  })
   @IsOptional()
   @IsISO8601()
-  to?:
-    string;
+  to?: string;
 }

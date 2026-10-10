@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - master
+      - feat/phase-11-deployment
 
   push:
     branches:
@@ -72,6 +73,12 @@ jobs:
 
       - name: Build API
         run: pnpm --filter api build
+
+      - name: Verify local documentation safeguards
+        run: pnpm --filter api test:openapi
+
+      - name: Validate OpenAPI and detect documentation drift
+        run: pnpm --filter api openapi:check
 
       - name: Run API unit tests
         run: pnpm --filter api test

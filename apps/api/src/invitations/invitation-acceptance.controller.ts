@@ -1,3 +1,4 @@
+import { ApiResource, ApiResult } from '../openapi/api-documentation.js';
 import {
   Body,
   Controller,
@@ -12,6 +13,7 @@ import { UsersService } from '../users/users.service.js';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';
 import { InvitationsService } from './invitations.service.js';
 
+@ApiResource('Invitations')
 @Controller('v1/invitations')
 export class InvitationAcceptanceController {
   constructor(
@@ -22,6 +24,7 @@ export class InvitationAcceptanceController {
       UsersService,
   ) {}
 
+  @ApiResult('AcceptedInvitation')
   @Post('accept')
   @HttpCode(200)
   @Throttle({

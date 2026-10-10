@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsIn,
@@ -17,17 +18,26 @@ const TICKET_PRIORITIES = [
 ] as const satisfies readonly TicketPriority[];
 
 export class UpdateTicketDto {
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim()
-      : value,
-  )
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    minLength: 1,
+    maxLength: 200,
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(200)
   subject?: string;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    maxLength: 5000,
+  })
   @Transform(({ value }) => {
     if (value === null) {
       return null;
@@ -39,15 +49,19 @@ export class UpdateTicketDto {
 
     const trimmed = value.trim();
 
-    return trimmed.length
-      ? trimmed
-      : null;
+    return trimmed.length ? trimmed : null;
   })
   @IsOptional()
   @IsString()
   @MaxLength(5000)
   description?: string | null;
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    enum: [...TICKET_PRIORITIES],
+  })
   @IsOptional()
   @IsIn([...TICKET_PRIORITIES])
   priority?: TicketPriority;
